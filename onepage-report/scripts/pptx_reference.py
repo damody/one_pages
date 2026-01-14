@@ -464,6 +464,178 @@ def example_mtk_layout():
 
 
 # =============================================================================
+# 術語超連結（投影片內超連結）
+# =============================================================================
+
+# 術語超連結樣式
+TERM_LINK_COLOR = RGBColor(0, 102, 204)  # 藍色
+
+def add_slide_hyperlink(run, target_slide_index, prs):
+    """
+    為文字 run 添加投影片內超連結
+
+    Args:
+        run: paragraph.add_run() 產生的 run 物件
+        target_slide_index: 目標投影片索引（0-based）
+        prs: Presentation 物件
+    """
+    from pptx.oxml import parse_xml
+
+    # 取得目標投影片
+    slide = prs.slides[target_slide_index]
+    slide_part = slide.part
+
+    # 建立超連結關係
+    rId = run.part.relate_to(
+        slide_part,
+        'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide'
+    )
+
+    # 設定超連結 XML（投影片跳轉動作）
+    hlinkClick = parse_xml(
+        f'<a:hlinkClick xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+        f'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
+        f'r:id="{rId}" action="ppaction://hlinksldjump"/>'
+    )
+    run._r.append(hlinkClick)
+
+
+def add_term_hyperlink(paragraph, term_text, target_slide_index, prs, font_size=10):
+    """
+    在段落中添加帶有投影片超連結的術語
+
+    Args:
+        paragraph: 文字段落物件
+        term_text: 術語文字
+        target_slide_index: 目標投影片索引（附錄頁）
+        prs: Presentation 物件
+        font_size: 字體大小（點）
+
+    Returns:
+        run: 添加的 run 物件
+    """
+    run = paragraph.add_run()
+    run.text = term_text
+
+    # 設定術語樣式（藍色、底線）
+    run.font.color.rgb = TERM_LINK_COLOR
+    run.font.underline = True
+    run.font.size = Pt(font_size)
+    run.font.name = FONT_NAME
+
+    # 添加投影片超連結
+    add_slide_hyperlink(run, target_slide_index, prs)
+
+    return run
+
+
+def parse_text_with_terms(text, paragraph, appendix_slide_index, prs, font_size=10):
+    """
+    解析包含 [[術語]] 標記的文字，並為術語添加超連結
+
+    Args:
+        text: 包含 [[術語]] 標記的原始文字
+        paragraph: 要添加內容的段落物件
+        appendix_slide_index: 附錄投影片索引
+        prs: Presentation 物件
+        font_size: 字體大小（點）
+
+    範例：
+        text = "降低跨 [[cluster]] 的 [[migration]]"
+        會產生：
+        - "降低跨 " (普通文字)
+        - "cluster" (藍色底線，可點擊跳到附錄)
+        - " 的 " (普通文字)
+        - "migration" (藍色底線，可點擊跳到附錄)
+    """
+    import re
+
+    # 用 [[...]] 分割文字
+    parts = re.split(r'\[\[(.+?)\]\]', text)
+
+    for i, part in enumerate(parts):
+        if not part:
+            continue
+
+        if i % 2 == 0:
+            # 偶數索引：普通文字
+            run = paragraph.add_run()
+            run.text = part
+            run.font.size = Pt(font_size)
+            run.font.name = FONT_NAME
+            run.font.color.rgb = DARK_GRAY
+        else:
+            # 奇數索引：術語，加超連結
+            add_term_hyperlink(paragraph, part, appendix_slide_index, prs, font_size)
+
+
+def add_content_box_with_terms(slide, left, top, width, height, title, content_lines,
+                                appendix_slide_index, prs, title_color=ACCENT_BLUE):
+    """
+    加入 MTK 風格的內容區塊，支援術語超連結
+
+    參數：
+    - left, top, width, height: 位置與大小（英吋）
+    - title: 區塊標題
+    - content_lines: 內容行（list of str），可包含 [[術語]] 標記
+    - appendix_slide_index: 附錄投影片索引
+    - prs: Presentation 物件
+    - title_color: 標題顏色
+    """
+    # 圓角矩形背景
+    shape = slide.shapes.add_shape(
+        MSO_SHAPE.ROUNDED_RECTANGLE,
+        Inches(left), Inches(top), Inches(width), Inches(height)
+    )
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = WHITE
+    shape.line.color.rgb = RGBColor(220, 220, 220)
+    shape.line.width = Pt(1)
+
+    # 標題
+    title_box = slide.shapes.add_textbox(
+        Inches(left + 0.08), Inches(top + 0.03),
+        Inches(width - 0.16), Inches(0.3)
+    )
+    tf = title_box.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    p.text = title
+    p.font.size = Pt(12)
+    p.font.bold = True
+    p.font.color.rgb = title_color
+    p.font.name = FONT_NAME
+
+    # 內容（支援術語超連結）
+    content_box = slide.shapes.add_textbox(
+        Inches(left + 0.08), Inches(top + 0.28),
+        Inches(width - 0.16), Inches(height - 0.32)
+    )
+    tf = content_box.text_frame
+    tf.word_wrap = True
+
+    for i, line in enumerate(content_lines):
+        if i == 0:
+            p = tf.paragraphs[0]
+        else:
+            p = tf.add_paragraph()
+
+        # 檢查是否有術語標記
+        if '[[' in line and ']]' in line:
+            parse_text_with_terms(line, p, appendix_slide_index, prs, font_size=10)
+        else:
+            p.text = line
+            p.font.size = Pt(10)
+            p.font.bold = True
+            p.font.color.rgb = DARK_GRAY
+            p.font.name = FONT_NAME
+
+        p.space_after = Pt(1)
+
+    return shape
+
+
+# =============================================================================
 # 儲存
 # =============================================================================
 
