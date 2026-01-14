@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">
+  <!-- 測試繁體中文字型 -->
+
+  <!-- 左側區塊：改善前 -->
+  <g transform="translate(20, 20)">
+    <rect x="0" y="0" width="160" height="160" rx="10" fill="#FFEBEE" stroke="#F44336" stroke-width="2"/>
+    <text x="80" y="30" text-anchor="middle" font-family="Microsoft JhengHei, 微軟正黑體, sans-serif" font-size="14" font-weight="bold" fill="#F44336">❌ 改善前</text>
+    <text x="80" y="60" text-anchor="middle" font-family="Microsoft JhengHei, 微軟正黑體, sans-serif" font-size="12" fill="#333">延遲：16毫秒</text>
+    <text x="80" y="85" text-anchor="middle" font-family="Microsoft JhengHei, 微軟正黑體, sans-serif" font-size="12" fill="#333">功耗：偏高</text>
+    <text x="80" y="110" text-anchor="middle" font-family="Microsoft JhengHei, 微軟正黑體, sans-serif" font-size="12" fill="#333">掉幀：頻繁發生</text>
+  </g>
+
+  <!-- 中間箭頭 -->
+  <g transform="translate(190, 80)">
+    <polygon points="0,0 30,20 0,40" fill="#4CAF50"/>
+  </g>
+
+  <!-- 右側區塊：改善後 -->
+  <g transform="translate(220, 20)">
+    <rect x="0" y="0" width="160" height="160" rx="10" fill="#E8F5E9" stroke="#4CAF50" stroke-width="2"/>
+    <text x="80" y="30" text-anchor="middle" font-family="Microsoft JhengHei, 微軟正黑體, sans-serif" font-size="14" font-weight="bold" fill="#4CAF50">✓ 改善後</text>
+    <text x="80" y="60" text-anchor="middle" font-family="Microsoft JhengHei, 微軟正黑體, sans-serif" font-size="12" fill="#333">延遲：8毫秒</text>
+    <text x="80" y="85" text-anchor="middle" font-family="Microsoft JhengHei, 微軟正黑體, sans-serif" font-size="12" fill="#333">功耗：降低</text>
+    <text x="80" y="110" text-anchor="middle" font-family="Microsoft JhengHei, 微軟正黑體, sans-serif" font-size="12" fill="#333">掉幀：減少80%</text>
+  </g>
+</svg>

@@ -903,6 +903,41 @@ arguments: [input_path]
 - 白色背景矩形
 - 字型：font-family="Microsoft JhengHei, Arial, sans-serif"
 - 圖要畫滿整個 viewBox，不要留太多空白
+- **禁止使用 emoji**：cairosvg 無法渲染 emoji，必須用 SVG 圖形代替
+
+## Emoji 替代方案（必須遵守）
+
+| 原本 Emoji | 替代 SVG 圖形 |
+|------------|---------------|
+| ❌ | 紅色圓圈 + 白色叉叉線條 |
+| ✓ ✅ | 綠色圓圈 + 白色勾勾線條 |
+| ⚠️ | 黃色三角形 + 黑色驚嘆號 |
+| 📊 | 藍色矩形 + 白色長條圖線條 |
+| 🔄 | 藍色圓形箭頭 |
+| ➡️ | polygon 箭頭圖形 |
+
+**SVG 圖形範例：**
+
+```xml
+<!-- 紅色叉叉（代替 ❌）-->
+<g>
+  <circle cx="10" cy="10" r="10" fill="#F44336"/>
+  <line x1="5" y1="5" x2="15" y2="15" stroke="white" stroke-width="2"/>
+  <line x1="15" y1="5" x2="5" y2="15" stroke="white" stroke-width="2"/>
+</g>
+
+<!-- 綠色勾勾（代替 ✓）-->
+<g>
+  <circle cx="10" cy="10" r="10" fill="#4CAF50"/>
+  <polyline points="5,10 8,14 15,6" stroke="white" stroke-width="2" fill="none"/>
+</g>
+
+<!-- 黃色警告（代替 ⚠️）-->
+<g>
+  <polygon points="10,2 19,18 1,18" fill="#FFC107" stroke="#FF9800" stroke-width="1"/>
+  <text x="10" y="15" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">!</text>
+</g>
+```
 
 ## 文字大小
 - 圖表標題：font-size="24"
@@ -1180,34 +1215,96 @@ Framepacing V2 透過預測下一幀完成時間，讓 GPU 提前準備，
 - 標記的術語會自動連結到附錄的解釋和圖解
 - 如果術語太多，考慮用白話文改寫
 
+**5.5 說明是否足夠詳細與白話？（國中生能懂標準）**
+
+這是最容易被忽略的問題。即使沒有專業術語，**說明本身也可能太簡略或太技術化**。
+
+**檢查原則：**
+- 想像一個國中生在讀這份報告
+- 每一句話，他能理解「這是什麼意思」嗎？
+- 每一個數字，他知道「這代表好還是壞」嗎？
+- 每一個結論，他明白「為什麼是這樣」嗎？
+
+**常見「不夠白話」的問題：**
+
+| 問題類型 | 原本寫法（不好） | 修改建議（好） |
+|----------|------------------|----------------|
+| 太簡略 | 「減少 migration」 | 「減少程式在不同處理器核心之間的搬移次數。每次搬移都要重新載入資料，很浪費時間」 |
+| 假設讀者懂 | 「L2 cache miss 率下降」 | 「處理器旁邊的高速暫存記憶體命中率提升，代表資料不用跑遠路去拿，速度變快了」 |
+| 數字沒意義 | 「延遲從 16ms 降到 8ms」 | 「延遲從 16 毫秒降到 8 毫秒。人眼能感覺到的延遲大約是 10 毫秒，所以這個改善會讓玩家明顯感覺更順暢」 |
+| 因果不明 | 「導入方案後效能提升」 | 「導入這個方案後，因為減少了不必要的資料搬移，處理器不用一直等資料，所以跑得更快了」 |
+| 專業口吻 | 「透過預測機制優化調度」 | 「讓系統提前猜測下一步要做什麼，預先準備好資料，就像服務生在你點餐前就把菜單準備好一樣」 |
+
+**審查時必須給出具體修改建議：**
+
+當發現說明不夠白話時，**不能只說「請改寫」**，必須給出具體的修改範例：
+
+```markdown
+## Issue: 說明不夠白話
+
+**原文位置**：技術關鍵點 - 第 2 點
+**原文**：「透過 SF queue 調整 buffer 數量來平衡延遲與功耗」
+**問題**：國中生不會懂 SF queue、buffer、延遲、功耗這些詞的關係
+
+**建議修改為**：
+「想像你在排隊買飲料。如果店員一次只做一杯（buffer 少），你等的時間短，但店員會很累（功耗高）。
+如果店員先做好三杯備著（buffer 多），你可能要等久一點，但店員比較輕鬆。
+這個技術就是在找最佳的『備貨數量』，讓你不用等太久，店員也不會太累。」
+
+**或簡化為**：
+「調整系統的『備用畫面數量』：備太多會延遲，備太少會耗電。這個技術找到最佳平衡點。」
+```
+
+**白話文改寫技巧：**
+
+1. **加入類比**：用日常生活的例子解釋技術概念
+   - cache → 書桌上的常用文件
+   - buffer → 排隊買飲料時店員預先做好的飲料
+   - migration → 搬家
+
+2. **解釋數字意義**：不只說數字，說這數字「好在哪裡」
+   - 原本：「FPS 從 55 提升到 60」
+   - 改為：「畫面更新率從 55 提升到 60。60 是大多數螢幕的上限，達到這個數字代表畫面完全順暢」
+
+3. **補充因果關係**：解釋「為什麼會這樣」
+   - 原本：「減少 migration 可改善效能」
+   - 改為：「減少搬移可改善效能，因為每次搬家都要重新整理行李（重載資料），很浪費時間」
+
+4. **分解長句**：一個句子只說一件事
+   - 原本：「透過預測下一幀完成時間並提前調整 CPU 頻率，可以避免來不及渲染而掉幀」
+   - 改為：「系統會預測『下一張畫面什麼時候要畫完』。如果發現快來不及了，就提前加速處理器。這樣就不會因為趕不上而讓畫面卡住。」
+
 **6. 關鍵術語是否有解釋？（與 glossary.md 連動）**
 - 報告中出現的專有名詞，讀者能理解它「是什麼」和「為何重要」嗎？
 - 數字或指標有說明「代表什麼意義」嗎？
 - **檢查 glossary.md 是否涵蓋所有 `[[術語]]` 標記**
+- **glossary.md 的解釋本身也要夠白話**（見下方範例）
 
 **術語解釋自檢：**
 ```
 對報告中每個專有名詞/機制/指標，問：
-1. 它是什麼？（定義）
-2. 它在這份報告中扮演什麼角色？（關聯性）
-3. 讀者不懂這個詞，還能理解報告嗎？（必要性）
-4. 是否已在 glossary.md 中有對應解釋？（附錄完整性）
+1. 它是什麼？（定義）→ 用國中生聽得懂的話解釋
+2. 它在這份報告中扮演什麼角色？（關聯性）→ 說明跟報告主題的關係
+3. 讀者不懂這個詞，還能理解報告嗎？（必要性）→ 如果不能，必須解釋或改寫
+4. 是否已在 glossary.md 中有對應解釋？（附錄完整性）→ 解釋本身也要夠白話
 ```
 
 **常見未解釋術語問題：**
 
 | 問題模式 | 範例 | 修正方向 |
 |----------|------|----------|
-| 機制名稱無定義 | 「BufferTX 維持 2.2±0.4」 | 加入 glossary + 標記 `[[BufferTX]]` |
-| 階段名稱無關聯 | 「UE5 五階段時間點」 | 在 glossary 說明「五階段用於預測下一幀完成時間」 |
-| 指標無意義說明 | 「Jank 降低 80%」 | 加入 glossary 解釋「Jank = 掉幀次數」 |
-| 縮寫無展開 | 「SF queue 機制」 | 加入 glossary 展開「SF = SurfaceFlinger」 |
-| 已標記但無解釋 | `[[術語]]` 但 glossary 沒有 | 補充 glossary 條目 |
+| 機制名稱無定義 | 「BufferTX 維持 2.2±0.4」 | 加入 glossary + 標記 `[[BufferTX]]`，解釋「BufferTX 是備用畫面的數量，2.2 代表平均備著 2 張多一點的畫面」 |
+| 階段名稱無關聯 | 「UE5 五階段時間點」 | 在 glossary 說明「遊戲引擎把畫一張畫面分成五個步驟，這五個時間點用來預測什麼時候能畫完」 |
+| 指標無意義說明 | 「Jank 降低 80%」 | 加入 glossary 解釋「Jank 是畫面卡頓的次數。降低 80% 代表原本卡 10 次，現在只卡 2 次」 |
+| 縮寫無展開 | 「SF queue 機制」 | 加入 glossary 展開「SF 是 SurfaceFlinger，Android 系統負責把畫面送到螢幕的程式。queue 是它的等候區」 |
+| 已標記但無解釋 | `[[術語]]` 但 glossary 沒有 | 補充 glossary 條目，**用國中生能懂的話寫** |
+| 解釋本身太技術 | glossary 寫「L2 cache 是處理器的二級快取」 | 改為「L2 cache 是處理器旁邊的高速小倉庫，把常用的資料放在這裡，就不用每次都去很遠的大倉庫拿」 |
 
 **修正原則：**
 - 在 one_page.md 中用 `[[術語]]` 標記需解釋的詞
 - 確保每個標記的術語都在 glossary.md 中有對應條目
-- 所有術語都要用國中生能懂的白話文解釋
+- **所有術語都要用國中生能懂的白話文解釋**（不能用另一個術語解釋術語）
+- **加入日常生活類比**（讓抽象概念變具體）
 - 必要時加入圖解說明（在附錄中提供視覺化解釋）
 - 附錄投影片會自動根據 glossary.md 產生
 
@@ -1332,20 +1429,38 @@ Framepacing V2 透過預測下一幀完成時間，讓 GPU 提前準備，
 
 將發現的問題整理成以下格式，並分類處理方式：
 
+**Issue 類型說明：**
+
+| 類型 | 說明 | 處理方式 |
+|------|------|----------|
+| `missing_evidence` | 缺少證據 | material / web_research / experiment |
+| `ambiguity` | 表述模糊 | user_input |
+| `inconsistency` | 資料矛盾 | user_input |
+| `decision_risk` | 決策風險 | user_input |
+| `undefined_term` | 術語未定義 | 加入 glossary |
+| `logic_gap` | 邏輯斷鏈 | 補充說明 / 弱化結論 |
+| `pyramid_violation` | 金字塔結構問題 | 調整結構 |
+| `script_logic_gap` | 演講稿邏輯問題 | 重寫演講稿 |
+| **`not_plain_enough`** | **說明不夠白話** | **提供具體改寫建議** |
+
 ```markdown
 ## 審稿結果
 
 我以主管角度審視了初稿，發現以下需要確認的問題：
 
 ### Q1：{問題標題}
-- **類型**：{missing_evidence | ambiguity | inconsistency | decision_risk | undefined_term | logic_gap | pyramid_violation | script_logic_gap}
+- **類型**：{missing_evidence | ambiguity | inconsistency | decision_risk | undefined_term | logic_gap | pyramid_violation | script_logic_gap | not_plain_enough}
 - **問題**：{具體描述問題}
-- **位置**：{標題/證據/影響/行動/圖表/演講稿}
+- **位置**：{標題/證據/影響/行動/圖表/演講稿/glossary}
 - **斷鏈分析**（如為 logic_gap 或 script_logic_gap）：
   - 推論鏈：{A} → {B} → {C}
   - 斷鏈處：{B} → {C}
   - 缺失：{缺少什麼才能連上}
-- **處理**：{material | web_research | experiment | user_input}
+- **白話分析**（如為 not_plain_enough）：
+  - 原文：「{原本的寫法}」
+  - 問題：{哪裡國中生看不懂}
+  - 建議改為：「{具體的白話文改寫}」
+- **處理**：{material | web_research | experiment | user_input | rewrite}
 - **建議**：{修正方向}
 
 ### Q2：{問題標題}
@@ -1840,11 +1955,41 @@ cd ./output && python render_this.py
 **render_this.py 的基本結構：**
 
 ```python
+import os
+import cairosvg
 from pptx import Presentation
 from pptx.util import Inches, Pt
-from pptx.dml.color import RgbColor
+from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.enum.shapes import MSO_SHAPE
+
+# =============================================================================
+# Step 1: SVG 轉 PNG（必須在建立 PPTX 之前執行）
+# =============================================================================
+
+def convert_svg_to_png(svg_path, png_path=None, scale=2):
+    """將 SVG 轉換為透明背景的 PNG"""
+    if png_path is None:
+        png_path = svg_path.rsplit('.', 1)[0] + '.png'
+    cairosvg.svg2png(
+        url=svg_path,
+        write_to=png_path,
+        scale=scale,
+        background_color=None  # 保持透明背景
+    )
+    print(f"Converted: {os.path.basename(svg_path)} → {os.path.basename(png_path)}")
+    return png_path
+
+# 轉換所有 SVG 檔案
+svg_files = [f for f in os.listdir('.') if f.endswith('.svg')]
+for svg_file in svg_files:
+    convert_svg_to_png(svg_file)
+
+print(f"已轉換 {len(svg_files)} 個 SVG 檔案為 PNG")
+
+# =============================================================================
+# Step 2: 建立 PPTX
+# =============================================================================
 
 # 建立簡報
 prs = Presentation()
@@ -1859,7 +2004,8 @@ slide = prs.slides.add_slide(prs.slide_layouts[6])
 # 標題
 # ...
 
-# 圖片
+# 圖片（使用 .png 檔案，不是 .svg）
+# slide.shapes.add_picture('main_diagram.png', Inches(x), Inches(y), width=Inches(w))
 # ...
 
 # 各區塊（背景、證據、影響、行動）
