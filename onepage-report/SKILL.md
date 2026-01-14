@@ -1182,13 +1182,83 @@ Framepacing V2 透過預測下一幀完成時間，讓 GPU 提前準備，
 
 ---
 
-### Phase 4：主管審稿
+### Phase 4：主管審稿（必須使用 Sub Agent）
 
-模擬 VP/Director 角度審視初稿，找出潛在問題。
+**重要：必須使用 Task 工具調用 sub agent 執行審查**
 
-#### 審稿檢查清單
+為什麼要用 sub agent：
+- 獨立的上下文，不受之前生成內容的偏見影響
+- 真正以「主管視角」審查，而不是自己審自己
+- 避免「審跟沒審一樣」的問題
 
-逐一檢查以下項目：
+**Task 工具調用方式：**
+
+```
+Task(
+  description="主管視角審稿",
+  subagent_type="general-purpose",
+  prompt="""
+你是一位嚴格的技術主管（VP/Director 級別），正在審查一份技術報告。
+
+## 你的角色
+- 你沒有參與這份報告的撰寫，是第一次看到這份內容
+- 你的目標是找出所有可能的問題，確保報告經得起質疑
+- 你會用國中生的視角檢查：內容是否讓沒有技術背景的人也能看懂
+
+## 待審查的報告
+
+### one_page.md
+{貼上完整的 one_page.md 內容}
+
+### diagrams.md
+{貼上完整的 diagrams.md 內容}
+
+### script.md
+{貼上完整的 script.md 內容}
+
+### glossary.md
+{貼上完整的 glossary.md 內容}
+
+## 審稿檢查清單
+
+請逐一檢查以下項目，產出 Issue List：
+
+1. 結論是否過強？（有沒有證據支持）
+2. 數字是否有來源？
+3. 條件/範圍是否明確？
+4. 行動是否缺前提或風險？
+5. 術語是否讓國中生能懂？
+5.5 說明是否足夠詳細與白話？
+6. 關鍵術語是否有解釋？
+7. 邏輯鏈是否完整？
+8. 金字塔結構是否成立？
+9. 演講稿邏輯是否一步接一步？
+
+## 輸出格式
+
+請輸出 Issue List，格式如下：
+
+### Q1：{問題標題}
+- **類型**：{missing_evidence | ambiguity | inconsistency | decision_risk | undefined_term | logic_gap | pyramid_violation | script_logic_gap | not_plain_enough}
+- **問題**：{具體描述問題}
+- **位置**：{標題/證據/影響/行動/圖表/演講稿/glossary}
+- **白話分析**（如為 not_plain_enough）：
+  - 原文：「{原本的寫法}」
+  - 問題：{哪裡國中生看不懂}
+  - 建議改為：「{具體的白話文改寫}」
+- **處理**：{material | web_research | experiment | user_input | rewrite}
+- **建議**：{修正方向}
+
+如果沒有發現問題，請明確說明「審稿通過，無需修改」。
+"""
+)
+```
+
+---
+
+#### 審稿檢查清單（Sub Agent 參考）
+
+Sub agent 審稿時會逐一檢查以下項目：
 
 **1. 結論是否過強？**
 - 標題的宣稱是否有足夠證據支持？
@@ -1716,10 +1786,30 @@ Framepacing V2 透過預測下一幀完成時間，讓 GPU 提前準備，
 - 不可在沒數字時寫具體百分比
 - 不可忽略使用者提供的補充資訊
 
-重新產生：
-- one_page.md（修正版）
-- diagram.md（如需調整）
-- script.md（配合修正內容）
+**重要：每一輪都必須輸出完整的 Markdown 文件**
+
+每次重寫時，必須輸出**完整的**文件內容，不要只輸出差異或修改的部分：
+
+```
+✗ 錯誤做法：「將第 3 點改為...」「在技術關鍵點後加入...」
+✓ 正確做法：輸出完整的 one_page.md、diagrams.md、script.md、glossary.md
+```
+
+**原因：**
+- 每一輪的輸出必須是獨立完整的，不依賴上下文
+- 避免累積錯誤或遺漏
+- 方便使用者直接複製使用
+
+**每輪必須完整輸出的文件：**
+
+| 文件 | 說明 |
+|------|------|
+| `one_page.md` | 完整報告內容（每輪都要全部重新輸出）|
+| `diagrams.md` | 完整圖表規格（每輪都要全部重新輸出）|
+| `script.md` | 完整演講稿（每輪都要全部重新輸出）|
+| `glossary.md` | 完整術語表（每輪都要全部重新輸出）|
+
+即使某個文件沒有修改，也要完整輸出，確保每一輪的結果都是獨立可用的。
 
 ---
 
@@ -1727,13 +1817,24 @@ Framepacing V2 透過預測下一幀完成時間，讓 GPU 提前準備，
 
 當使用者設定多輪審稿時，重複 Phase 4 → Phase 5 流程。
 
+#### ⚠️ 關鍵原則：每輪審稿必須使用 Sub Agent
+
+**為什麼每輪都要用 Sub Agent？**
+
+如果同一個 AI 既寫又審，會產生「審跟沒審一樣」的問題：
+- AI 傾向認為自己寫的內容是正確的
+- 容易忽略自己剛才犯的錯誤
+- 缺乏獨立的批判視角
+
+每輪迭代的 Phase 4 審稿，都必須呼叫 Task tool 啟動獨立的 sub agent。
+
 #### 迭代邏輯
 
 ```
 迭代計數 = 1
 
 WHILE 迭代計數 <= MAX_ITERATIONS:
-    執行 Phase 4（審稿）
+    【必須用 Task tool 呼叫 sub agent】執行 Phase 4（審稿）
 
     IF 審稿通過（無 Issue 或全部為 minor）:
         BREAK  # 進入 Phase 6
@@ -1743,8 +1844,39 @@ WHILE 迭代計數 <= MAX_ITERATIONS:
         BREAK
 
     執行 Phase 4.5~4.7（查證/實驗/詢問）
-    執行 Phase 5（重寫）
+    執行 Phase 5（重寫） - 輸出完整 markdown
     迭代計數 += 1
+```
+
+#### 每輪審稿的 Task Tool 呼叫方式
+
+```
+Task tool 參數：
+- subagent_type: "general-purpose"
+- prompt: |
+    你是獨立審稿人，請審查以下一頁報告草稿。
+
+    ## 審稿標準（必須全部檢查）
+    1. 數據真實性：每個數字都有來源嗎？
+    2. 對比公平性：比較基準是否合理？
+    3. 結論支撐度：結論是否被數據支撐？
+    4. 白話程度：國中生能看懂嗎？
+    5. 術語解釋：專業術語有解釋嗎？
+
+    ## 輸入
+    one_page.md 內容：
+    {貼上完整 one_page.md}
+
+    glossary.md 內容：
+    {貼上完整 glossary.md}
+
+    ## 輸出格式
+    對每個檢查項目給出：
+    - ✅ 通過：簡述原因
+    - ❌ 未通過：具體指出問題 + 具體修改建議
+
+    特別注意「白話程度」：如果有任何段落國中生可能看不懂，
+    必須提供具體的「原句 → 改寫句」建議。
 ```
 
 #### 強制保守輸出（達到 MAX_ITERATIONS 仍有問題時）
@@ -1936,17 +2068,78 @@ png_files = convert_all_svg_to_png()
 
 2. 根據 one_page.md 的內容，動態產生 Python 程式碼
 
-3. **佈局決策原則**：
+3. **⚠️ 內容完整性要求（絕對禁止刪減）**：
+   - **one_page.md 的每一段文字都必須出現在投影片中**
+   - **glossary.md 的每一個術語解釋都必須放入附錄**
+   - 不能因為版面不夠就省略內容
+   - 如果內容太多，應該調小字體（最小 8pt）或分多頁，而不是刪減
+   - 表格的每一行每一列都必須完整呈現
+
+4. **佈局決策原則**：
    - 圖表與相關說明要放在一起
    - 根據內容量決定佈局（不要固定）
    - 證據多 → 可能需要左右分欄
    - 圖表複雜 → 給圖更多空間
-   - 字體大小根據內容量調整（但不小於 10pt）
+   - 字體大小根據內容量調整（但不小於 8pt）
    - **有表格時**：表格放在投影片下方或右側，參考 pptx_reference.py 的 `add_table()` 函數
 
-4. 將產生的程式碼儲存到 `./output/render_this.py`
+5. 將產生的程式碼儲存到 `./output/render_this.py`
 
-5. 執行產生 PPTX：
+6. **⚠️ 執行前必須用 Sub Agent 驗證內容完整性**
+
+#### 6.3.1 Sub Agent 驗證步驟（必須執行）
+
+在執行 render_this.py 之前，必須呼叫 Task tool 讓獨立的 sub agent 檢查程式碼是否完整包含所有內容。
+
+**Task tool 參數：**
+```
+subagent_type: "general-purpose"
+prompt: |
+    你是程式碼審查員，請驗證以下 Python 程式碼是否完整包含 markdown 的所有內容。
+
+    ## 審查任務
+    逐一比對 markdown 和 Python 程式碼，確保沒有遺漏任何內容。
+
+    ## 輸入 1：one_page.md 內容
+    ```markdown
+    {貼上完整 one_page.md}
+    ```
+
+    ## 輸入 2：glossary.md 內容
+    ```markdown
+    {貼上完整 glossary.md}
+    ```
+
+    ## 輸入 3：render_this.py 內容
+    ```python
+    {貼上完整 render_this.py}
+    ```
+
+    ## 審查清單（每項都要檢查）
+    1. one_page.md 的標題是否出現在 Python 中？
+    2. one_page.md 的每一個段落是否都有對應的文字？
+    3. one_page.md 的每一個重點是否都有出現？
+    4. one_page.md 的表格是否完整（每行每列）？
+    5. glossary.md 的每一個術語是否都在附錄中？
+    6. 數字是否正確（沒有抄錯或遺漏）？
+
+    ## 輸出格式
+    - ✅ 內容完整：所有內容都已包含
+    - ❌ 有遺漏：列出遺漏的內容，格式如下
+      - 遺漏 1：{具體描述哪段文字或數據沒有出現在 Python 中}
+      - 遺漏 2：...
+
+    如果有遺漏，必須明確指出是 markdown 的哪一段沒有對應到 Python 的哪裡。
+```
+
+**如果 Sub Agent 發現遺漏：**
+1. 根據指出的遺漏修改 render_this.py
+2. 再次呼叫 Sub Agent 驗證
+3. 重複直到 ✅ 內容完整
+
+#### 6.3.2 執行產生 PPTX
+
+驗證通過後，執行 Python：
 
 ```bash
 cd ./output && python render_this.py
