@@ -6,7 +6,7 @@ arguments: [input_path]
 
 # 一頁投影片產生器
 
-> 版本：v2.5
+> 版本：v2.6
 
 將素材（資料夾/PPTX/URL）轉換成專業的一頁投影片與演講稿。
 
@@ -14,7 +14,7 @@ arguments: [input_path]
 
 ### Phase 1：設定詢問
 
-使用**一次** AskUserQuestion 工具，同時詢問以下 4 個問題：
+使用**一次** AskUserQuestion 工具，同時詢問以下問題：
 
 ```json
 {
@@ -37,6 +37,15 @@ arguments: [input_path]
         {"label": "5 輪 (預設)", "description": "審稿→重寫→審稿，最多五輪"},
         {"label": "3 輪", "description": "審稿→重寫→審稿，最多三輪"},
         {"label": "自訂", "description": "輸入自訂次數"}
+      ]
+    },
+    {
+      "question": "示意圖要用什麼方式繪製？",
+      "header": "繪圖",
+      "multiSelect": false,
+      "options": [
+        {"label": "SVG/PNG (預設)", "description": "使用 SVG 生成後轉 PNG 嵌入，圖表精細但無法編輯"},
+        {"label": "PPTX Shapes", "description": "使用 PowerPoint 內建圖形繪製，可直接在 PPT 中編輯"}
       ]
     }
   ]
@@ -69,6 +78,7 @@ arguments: [input_path]
 - `PURPOSE`：報告目的
 - `EVIDENCE`：E0 / E1 / E2
 - `MAX_ITERATIONS`：正整數（預設 5）
+- `DIAGRAM_METHOD`：svg_png / pptx_shapes（預設 svg_png）
 
 ---
 
@@ -1740,7 +1750,7 @@ Sub agent 審稿時會逐一檢查以下項目：
 1. 自動計算 Delta（變化量/百分比）
 2. 判斷是否達到成功門檻
 3. 更新 one_page.md 中的證據區塊
-4. 在 citations.md 中新增實驗來源
+4. 在 citation_map.md 中新增實驗來源
 5. 更新實驗流程圖，加入實際結果
 
 ---
@@ -1808,6 +1818,7 @@ Sub agent 審稿時會逐一檢查以下項目：
 | `diagrams.md` | 完整圖表規格（每輪都要全部重新輸出）|
 | `script.md` | 完整演講稿（每輪都要全部重新輸出）|
 | `glossary.md` | 完整術語表（每輪都要全部重新輸出）|
+| `citation_map.md` | 完整來源對照表（每輪都要全部重新輸出）|
 
 即使某個文件沒有修改，也要完整輸出，確保每一輪的結果都是獨立可用的。
 
@@ -1920,13 +1931,24 @@ Task tool 參數：
 mkdir -p ./output
 ```
 
-#### 6.2 儲存 diagrams.md 並產生 SVG
+#### 6.2 儲存 diagrams.md 並產生圖表
 
-使用 **Task 工具調用 subagent** 生成 SVG 圖表。
+根據 `DIAGRAM_METHOD` 設定決定圖表產生方式：
+
+| DIAGRAM_METHOD | 處理流程 |
+|----------------|----------|
+| `svg_png` | 使用 Task subagent 生成 SVG → cairosvg 轉 PNG → 嵌入 PPTX |
+| `pptx_shapes` | 在 render_this.py 中直接使用 python-pptx shapes API 繪製 |
 
 1. 將 diagrams.md 內容儲存到 `./output/diagrams.md`
 
-2. 對於 diagrams.md 中的**每個圖表區塊**，使用 Task 工具調用 subagent 生成 SVG：
+---
+
+##### 6.2.A 方式一：SVG/PNG（當 DIAGRAM_METHOD = svg_png）
+
+使用 **Task 工具調用 subagent** 生成 SVG 圖表。
+
+對於 diagrams.md 中的**每個圖表區塊**，使用 Task 工具調用 subagent 生成 SVG：
 
 **Task 工具調用方式：**
 
@@ -2059,6 +2081,417 @@ png_files = convert_all_svg_to_png()
   ...
 </g>
 ```
+
+---
+
+##### 6.2.B 方式二：PPTX Shapes（當 DIAGRAM_METHOD = pptx_shapes）
+
+使用 python-pptx 內建的 shapes API 直接在投影片上繪製圖表。此方式的優點：
+- 產生的圖表可直接在 PowerPoint 中編輯
+- 不需要 cairosvg 依賴
+- 避免 emoji 無法渲染的問題
+- 更好的跨平台相容性
+
+**處理流程：**
+
+1. 解析 diagrams.md 中的圖表描述
+2. 在 render_this.py 中呼叫對應的 shapes 繪製函數
+3. 直接在投影片上繪製圖形（無需外部檔案）
+
+**圖表類型與 Shapes 實作對應：**
+
+| 圖表類型 | Shapes 實作方式 |
+|----------|----------------|
+| `before_after` | 左右兩個圓角矩形 + 中間箭頭 + 內部文字框 |
+| `platform_compare` | 上下兩個圓角矩形 + 內部流程節點 |
+| `flow` | 橫向圓角矩形序列 + 連接箭頭 |
+| `timeline` | 水平線 + 階段區塊 + 時間標註 |
+| `architecture` | 分層矩形 + 連接線 + 標籤文字 |
+
+**顏色定義（與 SVG 一致）：**
+
+```python
+from pptx.dml.color import RGBColor
+
+# 標準顏色
+COLOR_RED = RGBColor(244, 67, 54)      # #F44336 - 改善前/問題/負面
+COLOR_GREEN = RGBColor(76, 175, 80)    # #4CAF50 - 改善後/成功/正面
+COLOR_BLUE = RGBColor(33, 150, 243)    # #2196F3 - 流程/節點/中性
+COLOR_GRAY_BG = RGBColor(245, 245, 245)  # #F5F5F5 - 區塊背景
+COLOR_GRAY_BORDER = RGBColor(189, 189, 189)  # #BDBDBD - 邊框
+COLOR_TEXT = RGBColor(51, 51, 51)      # #333333 - 文字
+COLOR_WHITE = RGBColor(255, 255, 255)  # #FFFFFF - 白色文字
+```
+
+**Shapes 繪製函數範例（加入 render_this.py）：**
+
+```python
+from pptx.util import Inches, Pt
+from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+from pptx.dml.color import RGBColor
+
+# === 顏色定義 ===
+COLOR_RED = RGBColor(244, 67, 54)
+COLOR_GREEN = RGBColor(76, 175, 80)
+COLOR_BLUE = RGBColor(33, 150, 243)
+COLOR_GRAY_BG = RGBColor(245, 245, 245)
+COLOR_WHITE = RGBColor(255, 255, 255)
+
+# === 前後對比圖 ===
+def draw_before_after(slide, left, top, width, height, before_title, before_items, after_title, after_items):
+    """
+    繪製前後對比圖
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        before_title: 左側標題（如「改善前」）
+        before_items: 左側項目列表
+        after_title: 右側標題（如「改善後」）
+        after_items: 右側項目列表
+    """
+    box_width = (width - 0.4) / 2  # 中間留 0.4 吋
+
+    # 左側區塊（改善前）
+    before_box = slide.shapes.add_shape(
+        MSO_SHAPE.ROUNDED_RECTANGLE,
+        Inches(left), Inches(top),
+        Inches(box_width), Inches(height)
+    )
+    before_box.fill.solid()
+    before_box.fill.fore_color.rgb = COLOR_GRAY_BG
+    before_box.line.color.rgb = COLOR_RED
+    before_box.line.width = Pt(2)
+
+    # 左側標題
+    before_title_box = slide.shapes.add_textbox(
+        Inches(left + 0.1), Inches(top + 0.1),
+        Inches(box_width - 0.2), Inches(0.3)
+    )
+    tf = before_title_box.text_frame
+    p = tf.paragraphs[0]
+    p.text = before_title
+    p.font.size = Pt(12)
+    p.font.bold = True
+    p.font.color.rgb = COLOR_RED
+
+    # 左側內容
+    before_content = slide.shapes.add_textbox(
+        Inches(left + 0.1), Inches(top + 0.45),
+        Inches(box_width - 0.2), Inches(height - 0.55)
+    )
+    tf = before_content.text_frame
+    tf.word_wrap = True
+    for i, item in enumerate(before_items):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.text = f"• {item}"
+        p.font.size = Pt(10)
+        p.font.color.rgb = COLOR_TEXT
+
+    # 右側區塊（改善後）
+    after_box = slide.shapes.add_shape(
+        MSO_SHAPE.ROUNDED_RECTANGLE,
+        Inches(left + box_width + 0.4), Inches(top),
+        Inches(box_width), Inches(height)
+    )
+    after_box.fill.solid()
+    after_box.fill.fore_color.rgb = COLOR_GRAY_BG
+    after_box.line.color.rgb = COLOR_GREEN
+    after_box.line.width = Pt(2)
+
+    # 右側標題
+    after_title_box = slide.shapes.add_textbox(
+        Inches(left + box_width + 0.5), Inches(top + 0.1),
+        Inches(box_width - 0.2), Inches(0.3)
+    )
+    tf = after_title_box.text_frame
+    p = tf.paragraphs[0]
+    p.text = after_title
+    p.font.size = Pt(12)
+    p.font.bold = True
+    p.font.color.rgb = COLOR_GREEN
+
+    # 右側內容
+    after_content = slide.shapes.add_textbox(
+        Inches(left + box_width + 0.5), Inches(top + 0.45),
+        Inches(box_width - 0.2), Inches(height - 0.55)
+    )
+    tf = after_content.text_frame
+    tf.word_wrap = True
+    for i, item in enumerate(after_items):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.text = f"• {item}"
+        p.font.size = Pt(10)
+        p.font.color.rgb = COLOR_TEXT
+
+    # 中間箭頭
+    arrow = slide.shapes.add_shape(
+        MSO_SHAPE.RIGHT_ARROW,
+        Inches(left + box_width + 0.1), Inches(top + height/2 - 0.15),
+        Inches(0.2), Inches(0.3)
+    )
+    arrow.fill.solid()
+    arrow.fill.fore_color.rgb = COLOR_BLUE
+    arrow.line.fill.background()
+
+
+# === 流程圖 ===
+def draw_flow(slide, left, top, width, height, nodes):
+    """
+    繪製橫向流程圖
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        nodes: 節點列表，每個元素是 {"title": "...", "desc": "..."} 或純字串
+    """
+    node_count = len(nodes)
+    gap = 0.15  # 節點間距（箭頭空間）
+    arrow_width = 0.12
+    node_width = (width - gap * (node_count - 1)) / node_count
+
+    for i, node in enumerate(nodes):
+        x = left + i * (node_width + gap)
+
+        # 解析節點內容
+        if isinstance(node, dict):
+            title = node.get("title", "")
+            desc = node.get("desc", "")
+        else:
+            title = str(node)
+            desc = ""
+
+        # 節點矩形
+        shape = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            Inches(x), Inches(top),
+            Inches(node_width), Inches(height)
+        )
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = COLOR_BLUE
+        shape.line.fill.background()
+
+        # 節點文字
+        tf = shape.text_frame
+        tf.word_wrap = True
+        tf.auto_size = None
+
+        # 標題
+        p = tf.paragraphs[0]
+        p.text = title
+        p.font.size = Pt(10)
+        p.font.bold = True
+        p.font.color.rgb = COLOR_WHITE
+        p.alignment = PP_ALIGN.CENTER
+
+        # 描述（如果有）
+        if desc:
+            p2 = tf.add_paragraph()
+            p2.text = desc
+            p2.font.size = Pt(8)
+            p2.font.color.rgb = COLOR_WHITE
+            p2.alignment = PP_ALIGN.CENTER
+
+        # 垂直置中
+        tf.paragraphs[0].space_before = Pt(height * 36 / 2 - 10)
+
+        # 箭頭（最後一個不加）
+        if i < node_count - 1:
+            arrow = slide.shapes.add_shape(
+                MSO_SHAPE.RIGHT_ARROW,
+                Inches(x + node_width + 0.02), Inches(top + height/2 - 0.08),
+                Inches(arrow_width), Inches(0.16)
+            )
+            arrow.fill.solid()
+            arrow.fill.fore_color.rgb = RGBColor(150, 150, 150)
+            arrow.line.fill.background()
+
+
+# === 平台對比圖 ===
+def draw_platform_compare(slide, left, top, width, height, platform_a, platform_b):
+    """
+    繪製上下平台對比圖
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        platform_a: {"name": "PC", "color": COLOR_BLUE, "items": [...]}
+        platform_b: {"name": "手機", "color": COLOR_GREEN, "items": [...]}
+    """
+    box_height = (height - 0.3) / 2  # 中間留 0.3 吋
+
+    for i, platform in enumerate([platform_a, platform_b]):
+        y = top if i == 0 else top + box_height + 0.3
+        color = platform.get("color", COLOR_BLUE)
+
+        # 平台區塊
+        box = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            Inches(left), Inches(y),
+            Inches(width), Inches(box_height)
+        )
+        box.fill.solid()
+        box.fill.fore_color.rgb = COLOR_GRAY_BG
+        box.line.color.rgb = color
+        box.line.width = Pt(2)
+
+        # 平台標題
+        title_box = slide.shapes.add_textbox(
+            Inches(left + 0.1), Inches(y + 0.1),
+            Inches(width - 0.2), Inches(0.25)
+        )
+        tf = title_box.text_frame
+        p = tf.paragraphs[0]
+        p.text = platform.get("name", "")
+        p.font.size = Pt(11)
+        p.font.bold = True
+        p.font.color.rgb = color
+
+        # 平台內容
+        content_box = slide.shapes.add_textbox(
+            Inches(left + 0.1), Inches(y + 0.4),
+            Inches(width - 0.2), Inches(box_height - 0.5)
+        )
+        tf = content_box.text_frame
+        tf.word_wrap = True
+        for j, item in enumerate(platform.get("items", [])):
+            p = tf.paragraphs[0] if j == 0 else tf.add_paragraph()
+            p.text = f"• {item}"
+            p.font.size = Pt(9)
+            p.font.color.rgb = COLOR_TEXT
+
+
+# === 時間軸圖 ===
+def draw_timeline(slide, left, top, width, height, stages):
+    """
+    繪製時間軸圖
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        stages: 階段列表，每個元素是 {"name": "...", "time": "...ms", "color": COLOR_*}
+    """
+    line_y = top + height * 0.6
+    stage_count = len(stages)
+    stage_width = width / stage_count
+
+    # 水平主軸線
+    line = slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE,
+        Inches(left), Inches(line_y),
+        Inches(width), Inches(0.03)
+    )
+    line.fill.solid()
+    line.fill.fore_color.rgb = RGBColor(100, 100, 100)
+    line.line.fill.background()
+
+    for i, stage in enumerate(stages):
+        x = left + i * stage_width
+        color = stage.get("color", COLOR_BLUE)
+
+        # 階段區塊（在軸線上方）
+        box = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            Inches(x + 0.05), Inches(top),
+            Inches(stage_width - 0.1), Inches(height * 0.5)
+        )
+        box.fill.solid()
+        box.fill.fore_color.rgb = color
+        box.line.fill.background()
+
+        # 階段名稱
+        tf = box.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.text = stage.get("name", "")
+        p.font.size = Pt(9)
+        p.font.bold = True
+        p.font.color.rgb = COLOR_WHITE
+        p.alignment = PP_ALIGN.CENTER
+
+        # 時間標註（在軸線下方）
+        if stage.get("time"):
+            time_box = slide.shapes.add_textbox(
+                Inches(x), Inches(line_y + 0.08),
+                Inches(stage_width), Inches(0.25)
+            )
+            tf = time_box.text_frame
+            p = tf.paragraphs[0]
+            p.text = stage["time"]
+            p.font.size = Pt(8)
+            p.font.color.rgb = RGBColor(100, 100, 100)
+            p.alignment = PP_ALIGN.CENTER
+```
+
+**使用範例（在 render_this.py 中）：**
+
+```python
+# 主投影片上的前後對比圖
+draw_before_after(
+    slide=main_slide,
+    left=0.3, top=2.5, width=6.0, height=2.5,
+    before_title="改善前：Frame Queue 堆積",
+    before_items=[
+        "GPU 不知道遊戲目標幀率",
+        "BufferQueue 堆積 2-3 幀",
+        "延遲累積達 50-80ms"
+    ],
+    after_title="改善後：SDK 同步機制",
+    after_items=[
+        "SDK 通知目標幀率",
+        "GPU 同步渲染節奏",
+        "延遲降低 81%"
+    ]
+)
+
+# 附錄的流程圖
+draw_flow(
+    slide=appendix_slide,
+    left=0.5, top=1.5, width=12.0, height=0.8,
+    nodes=[
+        {"title": "觸控輸入", "desc": "5ms"},
+        {"title": "遊戲處理", "desc": "16ms"},
+        {"title": "GPU 渲染", "desc": "8ms"},
+        {"title": "顯示輸出", "desc": "8ms"}
+    ]
+)
+```
+
+**diagrams.md 格式調整（pptx_shapes 專用）：**
+
+當使用 pptx_shapes 時，diagrams.md 改用結構化參數格式：
+
+```markdown
+## 主圖表
+
+- **類型**：before_after
+- **說明**：Frame Queue 堆積問題與解決方案
+- **位置**：left=0.3, top=2.5, width=6.0, height=2.5
+
+### Shapes 參數
+
+```json
+{
+  "before_title": "改善前：Frame Queue 堆積",
+  "before_items": [
+    "GPU 不知道遊戲目標幀率",
+    "BufferQueue 堆積 2-3 幀"
+  ],
+  "after_title": "改善後：SDK 同步機制",
+  "after_items": [
+    "SDK 通知目標幀率",
+    "延遲降低 81%"
+  ]
+}
+```
+```
+
+---
 
 #### 6.3 產生 PPTX
 
@@ -2502,9 +2935,9 @@ p.font.name = FONT_NAME
 1. PPTX 投影片的備註欄（方便簡報時直接看）
 2. `./output/speaker_script.md` 獨立檔案（方便編輯或列印）
 
-#### 6.5 輸出來源引用
+#### 6.5 輸出 Citation Map（來源對照表）
 
-將 Citation Map（含 Phase 2.6.5 擴充的補充說明）儲存到 `./output/citations.md`，格式如下：
+將 Citation Map（含 Phase 2.6.5 擴充的補充說明）儲存到 `./output/citation_map.md`，格式如下：
 
 ```markdown
 # 來源引用清單
@@ -2550,7 +2983,7 @@ p.font.name = FONT_NAME
 📝 ./output/speaker_script.md（演講稿獨立檔案）
 🖼️ ./output/*.svg（原始圖表）
 🖼️ ./output/*.png（透明背景圖表，嵌入 PPTX 用）
-📚 ./output/citations.md（來源引用）
+📚 ./output/citation_map.md（來源對照表，含 web search 補充說明）
 📖 ./output/glossary.md（術語詞彙表）
 
 投影片結構：
@@ -2561,7 +2994,7 @@ p.font.name = FONT_NAME
 1. 開啟 PPTX 確認排版
 2. 簡報時可開啟「簡報者檢視畫面」查看備註欄的演講稿
 3. 如需調整，可以直接編輯 PPTX
-4. 如被問「這數字哪來的？」，可查閱 citations.md
+4. 如被問「這數字哪來的？」，可查閱 citation_map.md
 5. 如聽眾對術語有疑問，可切到附錄頁說明
 ```
 
@@ -2571,12 +3004,12 @@ p.font.name = FONT_NAME
 
 ### SVG 生成失敗
 
-如果 subagent 生成 SVG 失敗：
+如果 subagent 生成 SVG 失敗（僅適用於 DIAGRAM_METHOD = svg_png）：
 
 1. 檢查 SVG 生成指示是否清晰完整
 2. 確認尺寸欄位格式正確（如 1056x528）
 3. 如果仍失敗，簡化圖表內容後重試
-4. 最後手段：改用 python-pptx shapes 畫簡單流程圖
+4. 若持續失敗，建議用戶改選 PPTX Shapes 方式重新執行
 
 ### PPTX 渲染失敗
 
