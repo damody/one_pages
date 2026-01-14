@@ -24,6 +24,176 @@ FONT_NAME = "Microsoft JhengHei"
 
 
 # ============================================================================
+# 元素追蹤與排版審查
+# ============================================================================
+
+# 全域元素追蹤清單（按投影片分組）
+slide_elements = {}  # {slide_index: [{"name": ..., "type": ..., "left": ..., "top": ..., "right": ..., "bottom": ...}, ...]}
+current_slide_index = 0
+
+
+def reset_element_tracker():
+    """重置元素追蹤清單"""
+    global slide_elements, current_slide_index
+    slide_elements = {}
+    current_slide_index = 0
+
+
+def set_current_slide(index):
+    """設定當前投影片索引"""
+    global current_slide_index
+    current_slide_index = index
+    if index not in slide_elements:
+        slide_elements[index] = []
+
+
+def track_element(name, left, top, width, height, element_type="generic"):
+    """
+    追蹤元素位置
+
+    Args:
+        name: 元素名稱（用於識別）
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        element_type: 元素類型 ("text", "diagram", "card", "background")
+    """
+    global slide_elements, current_slide_index
+
+    if current_slide_index not in slide_elements:
+        slide_elements[current_slide_index] = []
+
+    slide_elements[current_slide_index].append({
+        "name": name,
+        "type": element_type,
+        "left": left,
+        "top": top,
+        "right": left + width,
+        "bottom": top + height
+    })
+
+
+def boxes_overlap(box1, box2):
+    """
+    檢查兩個元素是否重疊
+
+    Args:
+        box1, box2: {"left": float, "top": float, "right": float, "bottom": float}
+
+    Returns:
+        bool: 是否重疊
+    """
+    return not (
+        box1["right"] <= box2["left"] or   # box1 在 box2 左邊
+        box1["left"] >= box2["right"] or   # box1 在 box2 右邊
+        box1["bottom"] <= box2["top"] or   # box1 在 box2 上方
+        box1["top"] >= box2["bottom"]      # box1 在 box2 下方
+    )
+
+
+def calculate_overlap_area(box1, box2):
+    """計算兩個元素的重疊面積"""
+    if not boxes_overlap(box1, box2):
+        return 0.0
+
+    overlap_left = max(box1["left"], box2["left"])
+    overlap_right = min(box1["right"], box2["right"])
+    overlap_top = max(box1["top"], box2["top"])
+    overlap_bottom = min(box1["bottom"], box2["bottom"])
+
+    return (overlap_right - overlap_left) * (overlap_bottom - overlap_top)
+
+
+def check_overlaps(slide_index):
+    """
+    檢查指定投影片上的元素是否有重疊
+
+    Returns:
+        list: 重疊的元素對 [{"element_a": ..., "element_b": ..., "overlap_area": ...}, ...]
+    """
+    if slide_index not in slide_elements:
+        return []
+
+    elements = slide_elements[slide_index]
+    overlaps = []
+
+    # 過濾掉背景元素
+    non_bg_elements = [e for e in elements if e["type"] != "background"]
+
+    for i in range(len(non_bg_elements)):
+        for j in range(i + 1, len(non_bg_elements)):
+            box1 = non_bg_elements[i]
+            box2 = non_bg_elements[j]
+
+            if boxes_overlap(box1, box2):
+                overlap_area = calculate_overlap_area(box1, box2)
+                overlaps.append({
+                    "element_a": box1,
+                    "element_b": box2,
+                    "overlap_area": overlap_area
+                })
+
+    return overlaps
+
+
+def layout_review(max_rounds=2):
+    """
+    執行排版審查
+
+    Args:
+        max_rounds: 最大審查輪數
+
+    Returns:
+        dict: 審查結果 {"passed": bool, "rounds": int, "total_overlaps": int, "details": [...]}
+    """
+    print(f"\n{'='*50}")
+    print(f"開始排版審查（最多 {max_rounds} 輪）")
+    print(f"{'='*50}")
+
+    all_details = []
+    total_overlaps = 0
+
+    for slide_idx in slide_elements:
+        overlaps = check_overlaps(slide_idx)
+        element_count = len([e for e in slide_elements[slide_idx] if e["type"] != "background"])
+
+        print(f"\n投影片 {slide_idx + 1}:")
+        print(f"  檢查元素數量：{element_count}")
+        print(f"  偵測到重疊：{len(overlaps)} 處")
+
+        if overlaps:
+            total_overlaps += len(overlaps)
+            for idx, overlap in enumerate(overlaps, 1):
+                ea = overlap["element_a"]
+                eb = overlap["element_b"]
+                area = overlap["overlap_area"]
+
+                detail = {
+                    "slide": slide_idx + 1,
+                    "element_a": ea["name"],
+                    "element_b": eb["name"],
+                    "overlap_area": area
+                }
+                all_details.append(detail)
+
+                print(f"\n  重疊 {idx}:")
+                print(f"    「{ea['name']}」與「{eb['name']}」重疊")
+                print(f"    - {ea['name']}: ({ea['left']:.2f}, {ea['top']:.2f}) - ({ea['right']:.2f}, {ea['bottom']:.2f})")
+                print(f"    - {eb['name']}: ({eb['left']:.2f}, {eb['top']:.2f}) - ({eb['right']:.2f}, {eb['bottom']:.2f})")
+                print(f"    - 重疊面積：{area:.3f} 平方吋")
+
+    print(f"\n{'='*50}")
+    if total_overlaps == 0:
+        print("排版審查通過！無重疊")
+        print(f"{'='*50}\n")
+        return {"passed": True, "rounds": 1, "total_overlaps": 0, "details": []}
+    else:
+        print(f"排版審查完成：發現 {total_overlaps} 處重疊")
+        print("請手動調整元素位置以消除重疊")
+        print(f"{'='*50}\n")
+        return {"passed": False, "rounds": 1, "total_overlaps": total_overlaps, "details": all_details}
+
+
+# ============================================================================
 # 圖表繪製函數
 # ============================================================================
 
@@ -951,6 +1121,9 @@ def draw_glossary_page_text_only(slide, title, terms):
 # ============================================================================
 
 if __name__ == "__main__":
+    # 初始化元素追蹤
+    reset_element_tracker()
+
     prs = Presentation()
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
@@ -959,6 +1132,7 @@ if __name__ == "__main__":
     # 第 1 頁：模擬真實報告 - 主投影片
     # ========================================================================
     slide1 = prs.slides.add_slide(prs.slide_layouts[6])
+    set_current_slide(0)  # 設定當前投影片索引
 
     # 主標題
     title = slide1.shapes.add_textbox(Inches(0.3), Inches(0.15), Inches(12.7), Inches(0.5))
@@ -999,6 +1173,7 @@ if __name__ == "__main__":
             "操作即時反饋"
         ]
     )
+    track_element("問題與解決方案", 0.3, 1.0, 6.2, 2.65, "diagram")
 
     # 右側：關鍵指標
     add_section_title(slide1, 6.8, 1.0, 6.0, "預期效益")
@@ -1011,12 +1186,13 @@ if __name__ == "__main__":
             {"value": "99%", "label": "幀率穩定度", "color": COLOR_ACCENT}
         ]
     )
+    track_element("預期效益", 6.8, 1.0, 6.0, 1.45, "diagram")
 
     # 右側：驗證清單
     add_section_title(slide1, 6.8, 2.6, 6.0, "成功判定準則")
     draw_icon_list(
         slide=slide1,
-        left=6.8, top=2.95, width=5.8, item_height=0.38,
+        left=6.8, top=2.9, width=5.8, item_height=0.32,  # 縮小 item_height 避免重疊
         items=[
             {"icon": "check", "text": "Click-to-Photon 延遲 < 30ms"},
             {"icon": "check", "text": "Frame Queue 維持 0-1 幀"},
@@ -1024,12 +1200,13 @@ if __name__ == "__main__":
             {"icon": "warn", "text": "需驗證 10 款熱門遊戲"}
         ]
     )
+    track_element("成功判定準則", 6.8, 2.6, 5.8, 1.58, "text")  # 2.6 + 0.3(標題) + 0.32*4 = 4.18
 
-    # 中間：技術流程
-    add_section_title(slide1, 0.3, 3.8, 12.7, "技術方案流程")
+    # 中間：技術流程（調整位置避免重疊）
+    add_section_title(slide1, 0.3, 4.25, 12.7, "技術方案流程")
     draw_flow(
         slide=slide1,
-        left=0.3, top=4.15, width=12.7, height=0.85,
+        left=0.3, top=4.55, width=12.7, height=0.75,  # 往下移並稍微縮小高度
         nodes=[
             {"title": "遊戲", "desc": "設定目標幀率", "color": COLOR_BLUE},
             {"title": "SDK", "desc": "傳遞同步訊號", "color": COLOR_GREEN},
@@ -1038,12 +1215,13 @@ if __name__ == "__main__":
             {"title": "顯示", "desc": "降低延遲", "color": COLOR_ACCENT}
         ]
     )
+    track_element("技術方案流程", 0.3, 4.25, 12.7, 1.05, "diagram")
 
-    # 下方左側：POC 設計
-    add_section_title(slide1, 0.3, 5.15, 6.0, "POC 實驗設計")
+    # 下方左側：POC 設計（調整位置）
+    add_section_title(slide1, 0.3, 5.45, 6.0, "POC 實驗設計")
     add_content_box(
         slide=slide1,
-        left=0.3, top=5.45, width=6.2, height=1.7,
+        left=0.3, top=5.75, width=6.2, height=1.45,  # 稍微縮小高度
         title="A/B 測試方案",
         content=[
             "A 組：現行機制（Baseline）",
@@ -1054,20 +1232,21 @@ if __name__ == "__main__":
         title_color=COLOR_BLUE,
         bg_color=COLOR_GRAY_BG
     )
+    track_element("POC 實驗設計", 0.3, 5.45, 6.2, 1.75, "text")
 
-    # 下方右側：行動建議
-    add_section_title(slide1, 6.8, 5.15, 6.0, "建議行動")
+    # 下方右側：行動建議（調整位置）
+    add_section_title(slide1, 6.8, 5.45, 6.0, "建議行動")
     action_box = slide1.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
-        Inches(6.8), Inches(5.45),
-        Inches(6.0), Inches(1.7)
+        Inches(6.8), Inches(5.75),
+        Inches(6.0), Inches(1.45)  # 稍微縮小高度
     )
     action_box.fill.solid()
     action_box.fill.fore_color.rgb = RGBColor(232, 245, 233)
     action_box.line.color.rgb = COLOR_GREEN
     action_box.line.width = Pt(2)
 
-    action_content = slide1.shapes.add_textbox(Inches(6.95), Inches(5.55), Inches(5.7), Inches(1.5))
+    action_content = slide1.shapes.add_textbox(Inches(6.95), Inches(5.85), Inches(5.7), Inches(1.25))
     tf = action_content.text_frame
     tf.word_wrap = True
 
@@ -1090,11 +1269,13 @@ if __name__ == "__main__":
         p.font.size = Pt(10)
         p.font.color.rgb = COLOR_TEXT
         p.font.name = FONT_NAME
+    track_element("建議行動", 6.8, 5.45, 6.0, 1.75, "text")
 
     # ========================================================================
     # 第 2 頁：附錄 - 架構圖 + 對比表
     # ========================================================================
     slide2 = prs.slides.add_slide(prs.slide_layouts[6])
+    set_current_slide(1)  # 設定當前投影片索引
 
     title = slide2.shapes.add_textbox(Inches(0.3), Inches(0.15), Inches(12.7), Inches(0.4))
     tf = title.text_frame
@@ -1181,6 +1362,7 @@ if __name__ == "__main__":
     # 第 3 頁：附錄 - 實驗設計
     # ========================================================================
     slide3 = prs.slides.add_slide(prs.slide_layouts[6])
+    set_current_slide(2)  # 設定當前投影片索引
 
     title = slide3.shapes.add_textbox(Inches(0.3), Inches(0.15), Inches(12.7), Inches(0.4))
     tf = title.text_frame
@@ -1278,6 +1460,7 @@ if __name__ == "__main__":
     # 第 4 頁：術語表 - 有圖片版（6 格）
     # ========================================================================
     slide4 = prs.slides.add_slide(prs.slide_layouts[6])
+    set_current_slide(3)  # 設定當前投影片索引
 
     terms_with_diagrams = [
         {
@@ -1337,6 +1520,7 @@ if __name__ == "__main__":
     # 第 5 頁：術語表 - 純文字版（16 格）
     # ========================================================================
     slide5 = prs.slides.add_slide(prs.slide_layouts[6])
+    set_current_slide(4)  # 設定當前投影片索引
 
     terms_text_only = [
         {"term": "Frame Queue", "desc": "GPU 渲染完成但尚未顯示的畫面佇列"},
@@ -1359,13 +1543,24 @@ if __name__ == "__main__":
 
     draw_glossary_page_text_only(slide5, "附錄 D：術語速查表（純文字版 - 16 格）", terms_text_only)
 
+    # ========================================================================
+    # 排版審查
+    # ========================================================================
+    review_result = layout_review(max_rounds=2)
+
     # 儲存
-    output_path = "./test_shapes_full_v3.pptx"
+    output_path = "./test_shapes_full_v4.pptx"
     prs.save(output_path)
-    print(f"完整測試完成！已儲存至：{output_path}")
+    print(f"\n完整測試完成！已儲存至：{output_path}")
     print("包含 5 頁投影片：")
     print("  1. 主投影片 - 完整報告佈局")
     print("  2. 附錄 A - 架構圖 + 對比表")
     print("  3. 附錄 B - POC 實驗設計")
     print("  4. 附錄 C - 術語解釋（有圖片版 6 格）")
     print("  5. 附錄 D - 術語速查表（純文字版 16 格）")
+
+    if not review_result["passed"]:
+        print(f"\n⚠️ 警告：排版審查發現 {review_result['total_overlaps']} 處重疊")
+        print("請檢查投影片並手動調整")
+    else:
+        print("\n✓ 排版審查通過！無元素重疊")

@@ -47,6 +47,17 @@ arguments: [input_path]
         {"label": "SVG/PNG (預設)", "description": "使用 SVG 生成後轉 PNG 嵌入，圖表精細但無法編輯"},
         {"label": "PPTX Shapes", "description": "使用 PowerPoint 內建圖形繪製，可直接在 PPT 中編輯"}
       ]
+    },
+    {
+      "question": "需要幾輪排版審查？",
+      "header": "排版",
+      "multiSelect": false,
+      "options": [
+        {"label": "2 輪 (預設)", "description": "檢查元素重疊，自動修正 2 次"},
+        {"label": "1 輪", "description": "快速檢查一次"},
+        {"label": "3 輪", "description": "嚴格審查三次"},
+        {"label": "關閉", "description": "不進行排版審查"}
+      ]
     }
   ]
 }
@@ -79,6 +90,7 @@ arguments: [input_path]
 - `EVIDENCE`：E0 / E1 / E2
 - `MAX_ITERATIONS`：正整數（預設 5）
 - `DIAGRAM_METHOD`：svg_png / pptx_shapes（預設 svg_png）
+- `LAYOUT_REVIEW_ROUNDS`：正整數（預設 2），0 表示關閉排版審查
 
 ---
 
@@ -2926,6 +2938,98 @@ p.font.name = FONT_NAME
 │ 暫存記憶體      │ 畫面更新率      │
 └─────────────────┴─────────────────┘
 ```
+
+#### 6.3.5 排版審查（Layout Review）
+
+**觸發條件**：`LAYOUT_REVIEW_ROUNDS > 0`
+
+在生成 PPTX 後，執行排版審查以確保所有元素不會重疊。
+
+**審查流程**：
+
+```
+FOR round = 1 TO LAYOUT_REVIEW_ROUNDS:
+    1. 收集投影片上所有元素的邊界框 (bounding box)
+    2. 對每對元素計算是否重疊
+    3. 若有重疊：
+       a. 記錄重疊元素對
+       b. 決定修正策略
+       c. 執行修正（調整位置、縮減內容或字體）
+    4. 若無重疊：提前結束審查，輸出「排版審查通過」
+```
+
+**重疊偵測方式**：
+
+收集每個元素的位置資訊：
+- `left`：左邊界（吋）
+- `top`：上邊界（吋）
+- `right`：右邊界 = left + width
+- `bottom`：下邊界 = top + height
+
+兩元素重疊判定：
+```python
+def boxes_overlap(box1, box2):
+    """檢查兩個元素是否重疊"""
+    return not (
+        box1["right"] <= box2["left"] or   # box1 在 box2 左邊
+        box1["left"] >= box2["right"] or   # box1 在 box2 右邊
+        box1["bottom"] <= box2["top"] or   # box1 在 box2 上方
+        box1["top"] >= box2["bottom"]      # box1 在 box2 下方
+    )
+```
+
+**修正策略優先順序**：
+
+| 優先順序 | 策略 | 說明 |
+|----------|------|------|
+| 1 | 調整位置 | 將下方元素往下移（需確保不超出頁面） |
+| 2 | 縮減間距 | 減少元素內部的 padding 和 line spacing |
+| 3 | 縮減內容 | 減少列表項目數量或縮短文字 |
+| 4 | 縮小字體 | 降低字體大小（最小 7pt） |
+
+**修正規則（依重疊類型）**：
+
+| 重疊類型 | 優先修正動作 |
+|----------|-------------|
+| 文字與圖表重疊 | 將圖表往下移，或縮短文字區域高度 |
+| 圖表與圖表重疊 | 縮小其中一個圖表尺寸 |
+| 文字與文字重疊 | 減少行數、縮小字體或縮小行高 |
+
+**審查報告格式**：
+
+```
+=== 排版審查 第 {round}/{LAYOUT_REVIEW_ROUNDS} 輪 ===
+
+檢查元素數量：{count}
+偵測到重疊：{overlap_count} 處
+
+重疊詳情：
+1. 「{element_a}」與「{element_b}」重疊
+   - {element_a}: ({left1:.2f}, {top1:.2f}) - ({right1:.2f}, {bottom1:.2f})
+   - {element_b}: ({left2:.2f}, {top2:.2f}) - ({right2:.2f}, {bottom2:.2f})
+   - 重疊區域：{overlap_area:.2f} 平方吋
+   - 修正動作：{action}
+
+修正後狀態：{PASS/FAIL}
+```
+
+**無重疊時輸出**：
+
+```
+=== 排版審查通過 ===
+檢查元素數量：{count}
+偵測到重疊：0 處
+審查輪數：{actual_rounds}/{LAYOUT_REVIEW_ROUNDS}（提前通過）
+```
+
+**實作注意事項**：
+
+1. 元素追蹤：在每個繪製函數呼叫後，記錄該元素的位置
+2. 只檢查同一投影片上的元素（不跨頁檢查）
+3. 背景元素（如整頁背景矩形）不列入重疊檢查
+4. 若達到最大輪數仍有重疊，輸出警告但繼續執行
+
+---
 
 #### 6.4 輸出演講稿
 
