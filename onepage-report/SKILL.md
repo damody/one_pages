@@ -6,9 +6,14 @@ arguments: [input_path]
 
 # 一頁投影片產生器
 
-> 版本：v2.7（模組化重構版）
+> 版本：v2.8（支援從中間繼續）
 
 將素材（資料夾/PPTX/URL）轉換成專業的一頁投影片與演講稿。
+
+**新功能：支援從中間 Phase 繼續執行**
+- 每個 Phase 完成後會自動儲存 checkpoint 到 `./output/phase{N}/`
+- 出錯或中斷後可以從任意 Phase 繼續，不需從頭開始
+- 使用者可以手動修改 checkpoint 檔案，然後繼續執行
 
 ---
 
@@ -36,6 +41,7 @@ arguments: [input_path]
 | `MAX_ITERATIONS` | 審稿輪數 | 5 |
 | `DIAGRAM_METHOD` | 繪圖方式 | pptx_shapes |
 | `LAYOUT_REVIEW_ROUNDS` | 排版審查輪數 | 2 |
+| `RESUME_FROM` | 從哪個 Phase 繼續（1-6） | 1 |
 
 ---
 
@@ -138,14 +144,39 @@ WHILE 迭代計數 <= MAX_ITERATIONS:
 
 ```
 ./output/
-├── one_page.pptx        # 主投影片（含附錄術語解釋）
-├── speaker_script.md    # 演講稿
-├── main_diagram.svg     # 主圖 SVG（如用 svg_png）
-├── main_diagram.png     # 主圖 PNG
-├── appendix_diagram_*.svg/png  # 附錄圖
-├── citation_map.md      # 來源對照表
-├── glossary.md          # 術語詞彙表
-└── render_this.py       # 產生 PPTX 的腳本
+├── phase1/                      # Phase 1 checkpoint
+│   └── config.md
+├── phase2/                      # Phase 2 checkpoint
+│   ├── materials.md
+│   ├── citation_map.md
+│   └── terms.md
+├── phase3/                      # Phase 3 checkpoint
+│   ├── one_page.md
+│   ├── diagrams.md
+│   ├── table.md
+│   ├── glossary.md
+│   └── script.md
+├── phase4/                      # Phase 4 checkpoint
+│   ├── issues.md
+│   ├── verification.md
+│   └── user_answers.md
+├── phase5/                      # Phase 5 checkpoint
+│   ├── one_page.md
+│   ├── diagrams.md
+│   ├── table.md
+│   ├── glossary.md
+│   ├── script.md
+│   └── citation_map.md
+├── iterations/                  # 多輪迭代版本保留
+│   ├── iter1/phase4/, phase5/
+│   └── iter2/phase4/, phase5/
+├── one_page.pptx                # 最終輸出：主投影片
+├── speaker_script.md            # 演講稿
+├── main_diagram.svg/png         # 主圖（如用 svg_png）
+├── appendix_diagram_*.svg/png   # 附錄圖
+├── citation_map.md              # 來源對照表
+├── glossary.md                  # 術語詞彙表
+└── render_this.py               # 產生 PPTX 的腳本
 ```
 
 ---

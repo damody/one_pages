@@ -336,3 +336,184 @@ draw_flow(
     ]
 )
 ```
+
+---
+
+## 進階圖表函數（詳細版）
+
+當 diagrams.md 的「SVG 生成指示」包含「內部流程」「橫向節點」「箭頭上標文字」等關鍵字時，必須使用以下進階函數。
+
+### 詳細版前後對比圖（帶內部流程）
+
+```python
+def draw_before_after_with_flow(
+    slide, left, top, width, height,
+    before_title, before_flow_nodes, before_arrow_labels,
+    after_title, after_flow_nodes, after_arrow_labels,
+    center_arrow_label="導入方案", bottom_table=None
+):
+    """
+    繪製帶內部流程圖的前後對比
+
+    Args:
+        before_flow_nodes: 左側內部流程節點列表，每個節點是 {
+            "title": "節點標題",
+            "desc": "說明文字",
+            "time": "時間標籤（可選）",
+            "color": 顏色,
+            "highlight": True/False（是否用紅色虛線標示問題點）
+        }
+        before_arrow_labels: 左側箭頭上的文字標籤列表
+        bottom_table: 底部對比表格 {
+            "headers": ["指標", "改善前", "改善後", "說明"],
+            "rows": [["堆積", "2-3幀", "0-1幀", "減少"], ...]
+        }
+    """
+```
+
+**Shapes 參數格式（詳細版）：**
+
+```json
+{
+  "type": "before_after_with_flow",
+  "before_title": "改善前：畫面堆積導致延遲",
+  "before_flow_nodes": [
+    {"title": "觸控輸入", "desc": "T=0", "color": "COLOR_BLUE"},
+    {"title": "Frame Queue", "desc": "堆積 2-3 幀", "color": "COLOR_RED", "highlight": true},
+    {"title": "GPU 畫圖", "desc": "等前面畫完", "color": "COLOR_BLUE"},
+    {"title": "螢幕顯示", "desc": "過時畫面", "color": "COLOR_BLUE"}
+  ],
+  "before_arrow_labels": ["讀取輸入", "等前面畫完", "送去顯示"],
+  "after_title": "改善後：精準同步即時反應",
+  "after_flow_nodes": [
+    {"title": "GPU 信號", "desc": "準備好了", "color": "COLOR_GREEN"},
+    {"title": "觸控輸入", "desc": "最佳時機", "color": "COLOR_GREEN"},
+    {"title": "GPU 畫圖", "desc": "立即畫", "color": "COLOR_GREEN"},
+    {"title": "螢幕顯示", "desc": "最新畫面", "color": "COLOR_GREEN"}
+  ],
+  "after_arrow_labels": ["同步信號", "馬上讀取", "直接顯示"],
+  "center_arrow_label": "導入 SDK",
+  "bottom_table": {
+    "headers": ["指標", "改善前", "改善後", "說明"],
+    "rows": [
+      ["Frame Queue 堆積", "2-3 幀", "0-1 幀", "排隊減少"],
+      ["輸入-顯示同步", "不精準", "精準對齊", "玩家感覺更即時"]
+    ]
+  }
+}
+```
+
+---
+
+### 詳細版流程圖（支援箭頭標籤）
+
+```python
+def draw_flow_detailed(slide, left, top, width, height, nodes, arrow_labels=None, show_highlight=True):
+    """
+    繪製詳細版橫向流程圖
+
+    Args:
+        nodes: 節點列表，每個元素是 {
+            "title": "節點標題",
+            "desc": "說明文字",
+            "time": "時間標籤（可選，會用淺黃色顯示）",
+            "color": 顏色,
+            "highlight": True/False（是否用紅色虛線框標示）
+        }
+        arrow_labels: 箭頭上的文字標籤列表（長度 = len(nodes)-1）
+        show_highlight: 是否顯示高亮標記
+    """
+```
+
+**Shapes 參數格式：**
+
+```json
+{
+  "type": "flow_detailed",
+  "nodes": [
+    {"title": "觸控輸入", "desc": "5ms", "color": "COLOR_BLUE"},
+    {"title": "Frame Queue", "desc": "等待中", "time": "+16~33ms", "highlight": true},
+    {"title": "GPU 渲染", "desc": "8ms", "color": "COLOR_GREEN"},
+    {"title": "顯示輸出", "desc": "即時", "color": "COLOR_ACCENT"}
+  ],
+  "arrow_labels": ["讀取", "排隊", "送出"]
+}
+```
+
+---
+
+### 平台對比圖（上下兩個流程）
+
+```python
+def draw_platform_compare(slide, left, top, width, height, platform_a, platform_b, differences=None):
+    """
+    繪製上下平台對比圖，每個平台內部有完整流程
+
+    Args:
+        platform_a: 上方平台 {
+            "name": "PC 平台",
+            "title": "AMD Anti-Lag 2 流程",
+            "color": COLOR_BLUE,
+            "flow_nodes": [...],
+            "arrow_labels": [...],
+            "summary": "效果：CS2 延遲降低 37%"
+        }
+        platform_b: 下方平台（同上格式）
+        differences: 差異標註列表 [
+            {"item": "輸入方式", "a": "滑鼠", "b": "觸控"},
+            {"item": "同步方式", "a": "遊戲引擎內建", "b": "MAGT 框架"}
+        ]
+    """
+```
+
+**Shapes 參數格式：**
+
+```json
+{
+  "type": "platform_compare",
+  "platform_a": {
+    "name": "PC 平台",
+    "title": "AMD Anti-Lag 2 流程（已驗證有效）",
+    "color": "COLOR_BLUE",
+    "flow_nodes": [
+      {"title": "滑鼠/鍵盤", "desc": "USB 1000Hz"},
+      {"title": "遊戲引擎 SDK", "desc": "同步機制"},
+      {"title": "獨立顯卡", "desc": "專門畫圖"},
+      {"title": "螢幕", "desc": "直接輸出"}
+    ],
+    "arrow_labels": ["輸入", "同步", "輸出"],
+    "summary": "效果：CS2 延遲降低 37%"
+  },
+  "platform_b": {
+    "name": "手機平台",
+    "title": "MTK Anti-Lag SDK 流程（提案）",
+    "color": "COLOR_GREEN",
+    "flow_nodes": [
+      {"title": "觸控螢幕", "desc": "手指點擊"},
+      {"title": "MAGT / SDK", "desc": "同步機制"},
+      {"title": "SoC 整合 GPU", "desc": "省電考量"},
+      {"title": "BufferQueue", "desc": "多一層"},
+      {"title": "螢幕", "desc": "目標 5%+"}
+    ],
+    "arrow_labels": ["讀取", "同步", "渲染", "送出"],
+    "summary": "目標：延遲降低 5%+"
+  },
+  "differences": [
+    {"item": "輸入方式", "a": "滑鼠鍵盤", "b": "觸控螢幕"},
+    {"item": "同步方式", "a": "遊戲引擎內建", "b": "MAGT 框架擴展"},
+    {"item": "顯示路徑", "a": "GPU 直出", "b": "經過 BufferQueue"}
+  ]
+}
+```
+
+---
+
+## 何時使用簡單版 vs 詳細版
+
+| 情況 | 使用函數 |
+|------|---------|
+| diagrams.md 只列出項目點 | `draw_before_after()` |
+| diagrams.md 有「內部流程」「橫向節點」 | `draw_before_after_with_flow()` |
+| diagrams.md 只列出步驟名稱 | `draw_flow()` |
+| diagrams.md 有「箭頭上標」「時間標籤」「問題標示」 | `draw_flow_detailed()` |
+| diagrams.md 有「上下對比」「平台對比」 | `draw_platform_compare()` |

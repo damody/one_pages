@@ -1,5 +1,19 @@
 # Phase 4：主管審稿（必須使用 Sub Agent）
 
+## 4.0 入口檢查
+
+**IF `RESUME_FROM` > 4：**
+1. 從 `./output/phase4/` 讀取 checkpoint：
+   - `issues.md` → Issue List
+   - `verification.md` → 查證結果（如有）
+   - `user_answers.md` → 使用者回答（如有）
+2. 跳過本 Phase，直接進入 Phase 5
+
+**ELSE：**
+- 正常執行下方流程
+
+---
+
 ## 為什麼要用 Sub Agent
 
 為什麼要用 sub agent：
@@ -276,3 +290,43 @@ Task(
 ```
 
 等待使用者回答後，進入 Phase 5。
+
+---
+
+## 4.8 Checkpoint 寫入
+
+Phase 4 完成後，將所有輸出儲存到 checkpoint：
+
+1. 建立目錄：`mkdir -p ./output/phase4`
+
+2. 使用 Write 工具寫入以下檔案：
+
+**./output/phase4/issues.md**
+```markdown
+# Issue List
+
+{Sub Agent 產生的 Issue List}
+```
+
+**./output/phase4/verification.md**
+```markdown
+# 網路查證結果
+
+{Phase 4.5 的查證結果，如無則寫入「# 無查證」}
+```
+
+**./output/phase4/user_answers.md**
+```markdown
+# 使用者回答
+
+{Phase 4.7 的使用者回答，如無則寫入「# 無需詢問」}
+```
+
+### 多輪迭代時的版本保留
+
+當迭代輪次 > 1 時，同時複製到 iterations 目錄：
+
+```bash
+mkdir -p ./output/iterations/iter{N}/phase4
+cp ./output/phase4/* ./output/iterations/iter{N}/phase4/
+```

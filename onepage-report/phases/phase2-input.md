@@ -1,5 +1,19 @@
 # Phase 2：讀取素材
 
+## 2.0 入口檢查
+
+**IF `RESUME_FROM` > 2：**
+1. 從 `./output/phase2/` 讀取 checkpoint：
+   - `materials.md` → 素材彙整
+   - `citation_map.md` → Citation Map
+   - `terms.md` → 術語清單
+2. 跳過本 Phase，直接進入 Phase 3
+
+**ELSE：**
+- 正常執行下方流程
+
+---
+
 根據 `{input_path}` 判斷輸入類型並處理。
 
 ## 2.1 判斷輸入類型
@@ -297,3 +311,34 @@
 - 如果術語對報告結論很重要，一定要找到解釋
 - 如果術語不重要，可以直接刪掉或改用白話文
 - 所有保留的術語都要加入 glossary.md
+
+---
+
+## 2.10 Checkpoint 寫入
+
+Phase 2 完成後，將所有輸出儲存到 checkpoint：
+
+1. 建立目錄：`mkdir -p ./output/phase2`
+
+2. 使用 Write 工具寫入以下檔案：
+
+**./output/phase2/materials.md**
+```markdown
+# 素材彙整
+
+{2.6 節產生的素材彙整內容}
+```
+
+**./output/phase2/citation_map.md**
+```markdown
+# Citation Map
+
+{2.7-2.8 節產生的 Citation Map 內容，含補充說明}
+```
+
+**./output/phase2/terms.md**
+```markdown
+# 術語處理清單
+
+{2.9 節產生的術語清單}
+```

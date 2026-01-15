@@ -1,5 +1,22 @@
 # Phase 5：根據回饋重寫
 
+## 5.0 入口檢查
+
+**IF `RESUME_FROM` > 5：**
+1. 從 `./output/phase5/` 讀取 checkpoint：
+   - `one_page.md` → 修正後主報告
+   - `diagrams.md` → 修正後圖表規格
+   - `table.md` → 修正後數據表
+   - `glossary.md` → 修正後術語詞彙表
+   - `script.md` → 修正後演講稿
+   - `citation_map.md` → 來源對照表
+2. 跳過本 Phase，直接進入 Phase 6
+
+**ELSE：**
+- 正常執行下方流程
+
+---
+
 根據使用者對 Issue List 的回答，修正初稿。
 
 ---
@@ -150,4 +167,53 @@ Task tool 參數：
 已自動採取保守處理，建議：
 1. 補充更多佐證後再報告
 2. 或以目前保守版本先行報告，說明後續會補充
+```
+
+---
+
+## 5.9 Checkpoint 寫入
+
+Phase 5 完成後，將所有輸出儲存到 checkpoint：
+
+1. 建立目錄：`mkdir -p ./output/phase5`
+
+2. 使用 Write 工具寫入以下檔案：
+
+**./output/phase5/one_page.md**
+```
+{修正後的主報告內容}
+```
+
+**./output/phase5/diagrams.md**
+```
+{修正後的圖表規格}
+```
+
+**./output/phase5/table.md**
+```
+{修正後的數據表，如無則寫入「# 無數據表」}
+```
+
+**./output/phase5/glossary.md**
+```
+{修正後的術語詞彙表}
+```
+
+**./output/phase5/script.md**
+```
+{修正後的演講稿}
+```
+
+**./output/phase5/citation_map.md**
+```
+{來源對照表}
+```
+
+### 多輪迭代時的版本保留
+
+當迭代輪次 > 1 時，同時複製到 iterations 目錄：
+
+```bash
+mkdir -p ./output/iterations/iter{N}/phase5
+cp ./output/phase5/* ./output/iterations/iter{N}/phase5/
 ```

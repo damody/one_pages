@@ -1,5 +1,21 @@
 # Phase 3：產生初稿
 
+## 3.0 入口檢查
+
+**IF `RESUME_FROM` > 3：**
+1. 從 `./output/phase3/` 讀取 checkpoint：
+   - `one_page.md` → 主報告內容
+   - `diagrams.md` → 圖表規格
+   - `table.md` → 數據表（如有）
+   - `glossary.md` → 術語詞彙表
+   - `script.md` → 演講稿
+2. 跳過本 Phase，直接進入 Phase 4
+
+**ELSE：**
+- 正常執行下方流程
+
+---
+
 根據素材內容與使用者設定，產生三到四份文件。
 
 ## 產出文件清單
@@ -134,3 +150,38 @@
 ```
 
 這些標記會在 Phase 6 渲染時轉換為超連結。
+
+---
+
+## 3.8 Checkpoint 寫入
+
+Phase 3 完成後，將所有輸出儲存到 checkpoint：
+
+1. 建立目錄：`mkdir -p ./output/phase3`
+
+2. 使用 Write 工具寫入以下檔案：
+
+**./output/phase3/one_page.md**
+```
+{3.1 節產生的主報告內容}
+```
+
+**./output/phase3/diagrams.md**
+```
+{3.3 節產生的圖表規格}
+```
+
+**./output/phase3/table.md**
+```
+{3.4 節產生的數據表，如無則寫入「# 無數據表」}
+```
+
+**./output/phase3/glossary.md**
+```
+{3.5 節產生的術語詞彙表}
+```
+
+**./output/phase3/script.md**
+```
+{3.6 節產生的演講稿}
+```

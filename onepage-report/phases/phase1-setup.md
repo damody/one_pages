@@ -1,5 +1,44 @@
 # Phase 1：設定詢問
 
+## 1.0 繼續執行檢測（最優先）
+
+**首先檢查是否有之前的執行記錄：**
+
+1. 使用 Glob 工具檢查 `./output/phase*/` 目錄是否存在
+2. 如果存在任何 phase 目錄，詢問使用者：
+
+```json
+{
+  "questions": [
+    {
+      "question": "檢測到之前的執行記錄，要從哪裡繼續？",
+      "header": "繼續",
+      "multiSelect": false,
+      "options": [
+        {"label": "從頭開始", "description": "清除所有 checkpoint，重新執行"},
+        {"label": "從 Phase 2 繼續", "description": "使用 phase1/ 的設定，從讀取素材開始"},
+        {"label": "從 Phase 3 繼續", "description": "使用 phase2/ 的素材，從產生初稿開始"},
+        {"label": "從 Phase 4 繼續", "description": "使用 phase3/ 的初稿，從審稿開始"}
+      ]
+    }
+  ]
+}
+```
+
+**注意：** 只顯示實際存在的選項。例如如果只有 phase1/ 存在，就只顯示「從頭開始」和「從 Phase 2 繼續」。
+
+3. 根據使用者選擇設定 `RESUME_FROM` 變數：
+   - 從頭開始：`RESUME_FROM = 1`，並刪除所有 `./output/phase*/` 目錄
+   - 從 Phase N 繼續：`RESUME_FROM = N`
+
+4. 如果 `RESUME_FROM > 1`：
+   - 讀取 `./output/phase1/config.md` 還原全域變數
+   - 跳過下方的設定詢問，直接進入下一個 Phase
+
+---
+
+## 1.1 設定詢問（僅當 RESUME_FROM = 1 時執行）
+
 使用**一次** AskUserQuestion 工具，同時詢問以下問題：
 
 ```json
@@ -102,3 +141,36 @@
 | `LAYOUT_REVIEW_ROUNDS` | 排版審查輪數 | 2（0 = 關閉）|
 | `REVIEW_WEB_SEARCH` | 審稿時是否啟用網路查證 | false |
 | `CITATION_WEB_SEARCH` | Citation Map 是否啟用網路補充 | false |
+| `RESUME_FROM` | 從哪個 Phase 繼續 | 1 |
+
+---
+
+## 1.3 Checkpoint 寫入
+
+設定完成後，將全域變數儲存到 checkpoint：
+
+1. 建立目錄：`mkdir -p ./output/phase1`
+
+2. 使用 Write 工具寫入 `./output/phase1/config.md`：
+
+```markdown
+# Phase 1 設定
+
+PURPOSE: {PURPOSE 的值}
+EVIDENCE: {EVIDENCE 的值}
+MAX_ITERATIONS: {MAX_ITERATIONS 的值}
+DIAGRAM_METHOD: {DIAGRAM_METHOD 的值}
+LAYOUT_REVIEW_ROUNDS: {LAYOUT_REVIEW_ROUNDS 的值}
+REVIEW_WEB_SEARCH: {REVIEW_WEB_SEARCH 的值}
+CITATION_WEB_SEARCH: {CITATION_WEB_SEARCH 的值}
+INPUT_PATH: {input_path 的值}
+```
+
+---
+
+## 1.4 Checkpoint 讀取格式
+
+當 `RESUME_FROM > 1` 時，從 `./output/phase1/config.md` 讀取並解析：
+
+- 每行格式為 `變數名: 值`
+- 將值還原到對應的全域變數

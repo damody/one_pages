@@ -585,6 +585,431 @@ def draw_icon_list(slide, left, top, width, item_height, items):
 
 
 # ============================================================================
+# 進階圖表繪製函數（支援詳細內容）
+# ============================================================================
+
+def draw_flow_detailed(slide, left, top, width, height, nodes, arrow_labels=None, show_highlight=True):
+    """
+    繪製詳細版橫向流程圖，支援箭頭上的文字標籤和高亮節點
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        nodes: 節點列表，每個元素是 {
+            "title": "節點標題",
+            "desc": "說明文字（可選）",
+            "time": "時間標籤（可選）",
+            "color": 顏色（可選，預設 COLOR_BLUE）,
+            "highlight": True/False（是否高亮，用紅色虛線框）
+        }
+        arrow_labels: 箭頭上的文字標籤列表（長度應為 len(nodes)-1）
+        show_highlight: 是否顯示高亮標記
+    """
+    node_count = len(nodes)
+    gap = 0.18  # 節點間距（箭頭空間）
+    arrow_width = 0.15
+    node_width = (width - gap * (node_count - 1)) / node_count
+
+    for i, node in enumerate(nodes):
+        x = left + i * (node_width + gap)
+
+        if isinstance(node, dict):
+            title = node.get("title", "")
+            desc = node.get("desc", "")
+            time_label = node.get("time", "")
+            color = node.get("color", COLOR_BLUE)
+            highlight = node.get("highlight", False)
+        else:
+            title = str(node)
+            desc = ""
+            time_label = ""
+            color = COLOR_BLUE
+            highlight = False
+
+        # 節點矩形
+        shape = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            Inches(x), Inches(top),
+            Inches(node_width), Inches(height)
+        )
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = color
+        shape.line.fill.background()
+
+        # 高亮標記（紅色虛線框）
+        if highlight and show_highlight:
+            highlight_box = slide.shapes.add_shape(
+                MSO_SHAPE.ROUNDED_RECTANGLE,
+                Inches(x - 0.03), Inches(top - 0.03),
+                Inches(node_width + 0.06), Inches(height + 0.06)
+            )
+            highlight_box.fill.background()
+            highlight_box.line.color.rgb = COLOR_RED
+            highlight_box.line.width = Pt(2)
+            highlight_box.line.dash_style = 2  # dash
+
+        # 節點文字
+        tf = shape.text_frame
+        tf.word_wrap = True
+        tf.paragraphs[0].alignment = PP_ALIGN.CENTER
+
+        p = tf.paragraphs[0]
+        p.text = title
+        p.font.size = Pt(9)
+        p.font.bold = True
+        p.font.color.rgb = COLOR_WHITE
+        p.font.name = FONT_NAME
+
+        if desc:
+            p2 = tf.add_paragraph()
+            p2.text = desc
+            p2.font.size = Pt(7)
+            p2.font.color.rgb = COLOR_WHITE
+            p2.font.name = FONT_NAME
+            p2.alignment = PP_ALIGN.CENTER
+
+        if time_label:
+            p3 = tf.add_paragraph()
+            p3.text = time_label
+            p3.font.size = Pt(7)
+            p3.font.bold = True
+            p3.font.color.rgb = RGBColor(255, 255, 200)  # 淺黃色
+            p3.font.name = FONT_NAME
+            p3.alignment = PP_ALIGN.CENTER
+
+        # 箭頭（最後一個不加）
+        if i < node_count - 1:
+            arrow = slide.shapes.add_shape(
+                MSO_SHAPE.RIGHT_ARROW,
+                Inches(x + node_width + 0.02), Inches(top + height/2 - 0.08),
+                Inches(arrow_width), Inches(0.16)
+            )
+            arrow.fill.solid()
+            arrow.fill.fore_color.rgb = RGBColor(100, 100, 100)
+            arrow.line.fill.background()
+
+            # 箭頭上的文字標籤
+            if arrow_labels and i < len(arrow_labels) and arrow_labels[i]:
+                label_box = slide.shapes.add_textbox(
+                    Inches(x + node_width + 0.02), Inches(top - 0.18),
+                    Inches(gap - 0.04), Inches(0.18)
+                )
+                tf = label_box.text_frame
+                p = tf.paragraphs[0]
+                p.text = arrow_labels[i]
+                p.font.size = Pt(6)
+                p.font.color.rgb = COLOR_TEXT
+                p.font.name = FONT_NAME
+                p.alignment = PP_ALIGN.CENTER
+
+
+def draw_before_after_with_flow(slide, left, top, width, height,
+                                 before_title, before_flow_nodes, before_arrow_labels,
+                                 after_title, after_flow_nodes, after_arrow_labels,
+                                 center_arrow_label="導入方案", bottom_table=None):
+    """
+    繪製帶內部流程圖的前後對比
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        before_title: 左側標題（如「改善前：畫面堆積導致延遲」）
+        before_flow_nodes: 左側內部流程節點列表
+        before_arrow_labels: 左側箭頭標籤列表
+        after_title: 右側標題
+        after_flow_nodes: 右側內部流程節點列表
+        after_arrow_labels: 右側箭頭標籤列表
+        center_arrow_label: 中間箭頭上的文字（如「導入 SDK」）
+        bottom_table: 底部對比表格 {"headers": [...], "rows": [[...], ...]}
+    """
+    # 計算佈局
+    table_height = 0.7 if bottom_table else 0
+    main_height = height - table_height
+    box_width = (width - 0.5) / 2  # 中間留 0.5 吋給箭頭
+    flow_area_height = main_height - 0.5  # 減去標題高度
+
+    # 左側區塊（改善前）
+    before_box = slide.shapes.add_shape(
+        MSO_SHAPE.ROUNDED_RECTANGLE,
+        Inches(left), Inches(top),
+        Inches(box_width), Inches(main_height)
+    )
+    before_box.fill.solid()
+    before_box.fill.fore_color.rgb = COLOR_GRAY_BG
+    before_box.line.color.rgb = COLOR_RED
+    before_box.line.width = Pt(2)
+
+    # 左側標題
+    before_title_box = slide.shapes.add_textbox(
+        Inches(left + 0.1), Inches(top + 0.08),
+        Inches(box_width - 0.2), Inches(0.35)
+    )
+    tf = before_title_box.text_frame
+    p = tf.paragraphs[0]
+    p.text = before_title
+    p.font.size = Pt(10)
+    p.font.bold = True
+    p.font.color.rgb = COLOR_RED
+    p.font.name = FONT_NAME
+
+    # 左側內部流程圖
+    if before_flow_nodes:
+        draw_flow_detailed(
+            slide,
+            left=left + 0.1,
+            top=top + 0.45,
+            width=box_width - 0.2,
+            height=flow_area_height - 0.1,
+            nodes=before_flow_nodes,
+            arrow_labels=before_arrow_labels,
+            show_highlight=True
+        )
+
+    # 右側區塊（改善後）
+    after_box = slide.shapes.add_shape(
+        MSO_SHAPE.ROUNDED_RECTANGLE,
+        Inches(left + box_width + 0.5), Inches(top),
+        Inches(box_width), Inches(main_height)
+    )
+    after_box.fill.solid()
+    after_box.fill.fore_color.rgb = COLOR_GRAY_BG
+    after_box.line.color.rgb = COLOR_GREEN
+    after_box.line.width = Pt(2)
+
+    # 右側標題
+    after_title_box = slide.shapes.add_textbox(
+        Inches(left + box_width + 0.6), Inches(top + 0.08),
+        Inches(box_width - 0.2), Inches(0.35)
+    )
+    tf = after_title_box.text_frame
+    p = tf.paragraphs[0]
+    p.text = after_title
+    p.font.size = Pt(10)
+    p.font.bold = True
+    p.font.color.rgb = COLOR_GREEN
+    p.font.name = FONT_NAME
+
+    # 右側內部流程圖
+    if after_flow_nodes:
+        draw_flow_detailed(
+            slide,
+            left=left + box_width + 0.6,
+            top=top + 0.45,
+            width=box_width - 0.2,
+            height=flow_area_height - 0.1,
+            nodes=after_flow_nodes,
+            arrow_labels=after_arrow_labels,
+            show_highlight=False
+        )
+
+    # 中間箭頭
+    arrow_y = top + main_height / 2 - 0.15
+    arrow = slide.shapes.add_shape(
+        MSO_SHAPE.RIGHT_ARROW,
+        Inches(left + box_width + 0.1), Inches(arrow_y),
+        Inches(0.3), Inches(0.3)
+    )
+    arrow.fill.solid()
+    arrow.fill.fore_color.rgb = COLOR_BLUE
+    arrow.line.fill.background()
+
+    # 中間箭頭上的文字
+    if center_arrow_label:
+        center_label = slide.shapes.add_textbox(
+            Inches(left + box_width + 0.05), Inches(arrow_y - 0.22),
+            Inches(0.4), Inches(0.2)
+        )
+        tf = center_label.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.text = center_arrow_label
+        p.font.size = Pt(7)
+        p.font.bold = True
+        p.font.color.rgb = COLOR_BLUE
+        p.font.name = FONT_NAME
+        p.alignment = PP_ALIGN.CENTER
+
+    # 底部對比表格
+    if bottom_table:
+        headers = bottom_table.get("headers", [])
+        rows = bottom_table.get("rows", [])
+        if headers and rows:
+            draw_comparison_table(
+                slide,
+                left=left, top=top + main_height + 0.05,
+                width=width, height=table_height - 0.05,
+                headers=headers, rows=rows
+            )
+
+
+def draw_platform_compare(slide, left, top, width, height,
+                          platform_a, platform_b, differences=None):
+    """
+    繪製上下平台對比圖，每個平台內部有完整流程
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        platform_a: 上方平台 {
+            "name": "PC 平台",
+            "title": "AMD Anti-Lag 2 流程（已驗證有效）",
+            "color": COLOR_BLUE,
+            "flow_nodes": [...],
+            "arrow_labels": [...],
+            "summary": "效果：CS2 延遲降低 37%"
+        }
+        platform_b: 下方平台（同上格式）
+        differences: 差異標註列表 [{"item": "輸入方式", "a": "滑鼠", "b": "觸控"}, ...]
+    """
+    # 計算佈局
+    diff_width = 0 if not differences else 2.5  # 差異欄位寬度
+    platform_width = width - diff_width - 0.1
+    platform_height = (height - 0.2) / 2
+
+    platforms = [platform_a, platform_b]
+    colors = [COLOR_BLUE, COLOR_GREEN]
+
+    for i, platform in enumerate(platforms):
+        y = top + i * (platform_height + 0.2)
+        color = platform.get("color", colors[i])
+        name = platform.get("name", f"平台 {i+1}")
+        title = platform.get("title", "")
+        flow_nodes = platform.get("flow_nodes", [])
+        arrow_labels = platform.get("arrow_labels", [])
+        summary = platform.get("summary", "")
+
+        # 平台區塊
+        box = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            Inches(left), Inches(y),
+            Inches(platform_width), Inches(platform_height)
+        )
+        box.fill.solid()
+        box.fill.fore_color.rgb = COLOR_GRAY_BG
+        box.line.color.rgb = color
+        box.line.width = Pt(2)
+
+        # 平台名稱標籤（左上角）
+        name_box = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            Inches(left + 0.1), Inches(y + 0.08),
+            Inches(1.0), Inches(0.28)
+        )
+        name_box.fill.solid()
+        name_box.fill.fore_color.rgb = color
+        name_box.line.fill.background()
+
+        tf = name_box.text_frame
+        p = tf.paragraphs[0]
+        p.text = name
+        p.font.size = Pt(9)
+        p.font.bold = True
+        p.font.color.rgb = COLOR_WHITE
+        p.font.name = FONT_NAME
+        p.alignment = PP_ALIGN.CENTER
+
+        # 標題
+        title_box = slide.shapes.add_textbox(
+            Inches(left + 1.2), Inches(y + 0.08),
+            Inches(platform_width - 1.4), Inches(0.28)
+        )
+        tf = title_box.text_frame
+        p = tf.paragraphs[0]
+        p.text = title
+        p.font.size = Pt(9)
+        p.font.bold = True
+        p.font.color.rgb = color
+        p.font.name = FONT_NAME
+
+        # 內部流程圖
+        if flow_nodes:
+            flow_height = platform_height - 0.7 if summary else platform_height - 0.45
+            draw_flow_detailed(
+                slide,
+                left=left + 0.1,
+                top=y + 0.4,
+                width=platform_width - 0.2,
+                height=flow_height,
+                nodes=flow_nodes,
+                arrow_labels=arrow_labels,
+                show_highlight=True
+            )
+
+        # 效果摘要
+        if summary:
+            summary_box = slide.shapes.add_textbox(
+                Inches(left + 0.1), Inches(y + platform_height - 0.25),
+                Inches(platform_width - 0.2), Inches(0.2)
+            )
+            tf = summary_box.text_frame
+            p = tf.paragraphs[0]
+            p.text = summary
+            p.font.size = Pt(8)
+            p.font.bold = True
+            p.font.color.rgb = color
+            p.font.name = FONT_NAME
+
+    # 差異標註欄（右側）
+    if differences:
+        diff_left = left + platform_width + 0.1
+        diff_box = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            Inches(diff_left), Inches(top),
+            Inches(diff_width), Inches(height)
+        )
+        diff_box.fill.solid()
+        diff_box.fill.fore_color.rgb = RGBColor(255, 243, 224)  # 淺橙色背景
+        diff_box.line.color.rgb = COLOR_ORANGE
+        diff_box.line.width = Pt(1)
+
+        # 差異標題
+        diff_title = slide.shapes.add_textbox(
+            Inches(diff_left + 0.1), Inches(top + 0.08),
+            Inches(diff_width - 0.2), Inches(0.25)
+        )
+        tf = diff_title.text_frame
+        p = tf.paragraphs[0]
+        p.text = "主要差異"
+        p.font.size = Pt(9)
+        p.font.bold = True
+        p.font.color.rgb = COLOR_ORANGE
+        p.font.name = FONT_NAME
+
+        # 差異項目
+        item_height = (height - 0.4) / len(differences)
+        for j, diff in enumerate(differences):
+            item_y = top + 0.35 + j * item_height
+            item_box = slide.shapes.add_textbox(
+                Inches(diff_left + 0.1), Inches(item_y),
+                Inches(diff_width - 0.2), Inches(item_height)
+            )
+            tf = item_box.text_frame
+            tf.word_wrap = True
+
+            p = tf.paragraphs[0]
+            p.text = diff.get("item", "")
+            p.font.size = Pt(8)
+            p.font.bold = True
+            p.font.color.rgb = COLOR_TEXT
+            p.font.name = FONT_NAME
+
+            p2 = tf.add_paragraph()
+            p2.text = f"PC: {diff.get('a', '')}"
+            p2.font.size = Pt(7)
+            p2.font.color.rgb = COLOR_BLUE
+            p2.font.name = FONT_NAME
+
+            p3 = tf.add_paragraph()
+            p3.text = f"手機: {diff.get('b', '')}"
+            p3.font.size = Pt(7)
+            p3.font.color.rgb = COLOR_GREEN
+            p3.font.name = FONT_NAME
+
+
+# ============================================================================
 # 文字方塊輔助函數
 # ============================================================================
 

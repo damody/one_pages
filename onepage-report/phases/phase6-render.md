@@ -1,5 +1,23 @@
 # Phase 6：渲染輸出
 
+## 6.0 入口檢查
+
+**IF `RESUME_FROM` = 6：**
+1. 從 `./output/phase5/` 讀取以下檔案作為輸入：
+   - `one_page.md` → 主報告內容
+   - `diagrams.md` → 圖表規格
+   - `table.md` → 數據表
+   - `glossary.md` → 術語詞彙表
+   - `script.md` → 演講稿
+   - `citation_map.md` → 來源對照表
+2. 如果 `phase5/` 不存在，從 `phase3/` 讀取（表示審稿通過無需修改）
+3. 使用讀取的檔案進行渲染
+
+**ELSE（正常流程）：**
+- 使用 Phase 5 產生的內容進行渲染
+
+---
+
 ## 6.1 建立輸出目錄
 
 ```bash
@@ -397,14 +415,122 @@ draw_before_after(
 
 | diagrams.md 類型 | 呼叫函數 | 用途 |
 |------------------|----------|------|
-| `before_after` | `draw_before_after()` | 前後對比圖 |
-| `flow` | `draw_flow()` | 橫向流程圖 |
+| `before_after`（簡單版） | `draw_before_after()` | 前後對比圖（項目列表） |
+| `before_after`（有內部流程） | `draw_before_after_with_flow()` | 前後對比圖（內部流程節點） |
+| `flow`（簡單版） | `draw_flow()` | 橫向流程圖 |
+| `flow`（詳細版） | `draw_flow_detailed()` | 橫向流程圖（支援箭頭標籤、高亮） |
+| `platform_compare` | `draw_platform_compare()` | 平台對比圖（上下兩個流程） |
 | `architecture` | `draw_architecture()` | 分層架構圖 |
 | `metric_cards` | `draw_metric_cards()` | 指標卡片（數字 + 說明）|
 | `comparison_table` | `draw_comparison_table()` | 對比表格 |
 | `icon_list` | `draw_icon_list()` | 帶圖標的列表（check/cross/warn）|
 | `glossary_with_diagrams` | `draw_glossary_page_with_diagrams()` | 術語頁（6 格有圖）|
 | `glossary_text_only` | `draw_glossary_page_text_only()` | 術語頁（16 格純文字）|
+
+---
+
+### 6.3.0.1 diagrams.md 完整繪製規則（強制）
+
+⚠️ **這是強制規則，必須遵守**
+
+#### 1. 必須繪製每個圖表
+
+diagrams.md 中的每個 `## ` 開頭的圖表都必須繪製，不能省略任何一個。
+
+```
+檢查清單：
+□ 主圖（第 1 頁主報告內的圖表）
+□ 附錄圖 1、2、3...（每個需要獨立的附錄頁面）
+□ 術語解釋頁
+```
+
+#### 2. 必須解析「SVG 生成指示」的詳細內容
+
+當 diagrams.md 的「SVG 生成指示」區塊包含以下內容時，**必須**相應處理：
+
+| 指示內容 | 必須處理方式 |
+|----------|-------------|
+| 「內部流程」「橫向節點」 | 使用 `draw_before_after_with_flow()` 或 `draw_flow_detailed()`，不能只用項目列表 |
+| 「箭頭上標文字」 | 傳入 `arrow_labels` 參數 |
+| 「問題標示」「紅色虛線框」 | 設定節點的 `highlight: True` |
+| 「底部表格」「對比表格」 | 傳入 `bottom_table` 參數或另外呼叫 `draw_comparison_table()` |
+| 「四層架構」「分層」 | 使用 `draw_architecture()` |
+| 「上下對比」「平台對比」 | 使用 `draw_platform_compare()` |
+
+#### 3. 判斷使用簡單版還是詳細版函數
+
+**使用 `draw_before_after()`（簡單版）的條件：**
+- diagrams.md 的「SVG 生成指示」只列出項目點（bullet points）
+- 沒有提到「內部流程」「節點」「箭頭上標」等關鍵字
+
+**使用 `draw_before_after_with_flow()`（詳細版）的條件：**
+- diagrams.md 的「SVG 生成指示」提到「內部流程」「橫向節點」
+- 列出多個有順序的步驟（如 1. 2. 3. 4.）
+- 提到箭頭上的文字、時間標籤、問題標示等
+
+#### 4. 附錄頁面產生規則
+
+```python
+# 投影片結構
+slide_1 = 主報告（one_page.md 內容 + 主圖）
+slide_2 = 附錄圖 1（如 diagrams.md 有「附錄圖 1」）
+slide_3 = 附錄圖 2（如 diagrams.md 有「附錄圖 2」）
+...
+slide_N = 術語解釋（glossary.md 內容）
+```
+
+**禁止**：將附錄圖省略或只用文字描述替代。
+
+#### 5. 參數轉換範例
+
+**diagrams.md 定義**（before_after 有內部流程）：
+```markdown
+## 主圖：前後對比
+
+### SVG 生成指示
+左側「改善前」內部流程：
+1. 觸控輸入 [時間點：T=0]
+2. Frame Queue [問題：堆積 2-3 幀] ⚠️ 問題點
+3. GPU 畫圖
+4. 螢幕顯示
+箭頭上標：讀取輸入 → 等前面畫完 → 送去顯示
+
+底部表格：
+| 指標 | 改善前 | 改善後 |
+...
+```
+
+**對應 render_this.py 程式碼**：
+```python
+draw_before_after_with_flow(
+    slide=slide,
+    left=0.3, top=1.5, width=12.7, height=3.5,
+    before_title="改善前：畫面堆積導致延遲",
+    before_flow_nodes=[
+        {"title": "觸控輸入", "desc": "T=0", "color": COLOR_BLUE},
+        {"title": "Frame Queue", "desc": "堆積 2-3 幀", "color": COLOR_RED, "highlight": True},
+        {"title": "GPU 畫圖", "desc": "等前面畫完", "color": COLOR_BLUE},
+        {"title": "螢幕顯示", "desc": "過時畫面", "color": COLOR_BLUE}
+    ],
+    before_arrow_labels=["讀取輸入", "等前面畫完", "送去顯示"],
+    after_title="改善後：精準同步即時反應",
+    after_flow_nodes=[
+        {"title": "GPU 信號", "desc": "準備好了", "color": COLOR_GREEN},
+        {"title": "觸控輸入", "desc": "最佳時機", "color": COLOR_GREEN},
+        {"title": "GPU 畫圖", "desc": "立即畫", "color": COLOR_GREEN},
+        {"title": "螢幕顯示", "desc": "最新畫面", "color": COLOR_GREEN}
+    ],
+    after_arrow_labels=["同步信號", "馬上讀取", "直接顯示"],
+    center_arrow_label="導入 SDK",
+    bottom_table={
+        "headers": ["指標", "改善前", "改善後", "說明"],
+        "rows": [
+            ["Frame Queue 堆積", "2-3 幀", "0-1 幀", "排隊減少"],
+            ["輸入-顯示同步", "不精準", "精準對齊", "玩家感覺更即時"]
+        ]
+    }
+)
+```
 
 ---
 
