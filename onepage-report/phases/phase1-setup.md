@@ -44,6 +44,24 @@
         {"label": "3 輪", "description": "嚴格審查三次"},
         {"label": "關閉", "description": "不進行排版審查"}
       ]
+    },
+    {
+      "question": "審稿時是否用網路搜尋補充資料？",
+      "header": "查證搜尋",
+      "multiSelect": false,
+      "options": [
+        {"label": "關閉 (預設)", "description": "審稿發現資料不足時，直接詢問使用者補充"},
+        {"label": "啟用", "description": "審稿發現資料不足時，先用 WebSearch 查證，再詢問使用者確認"}
+      ]
+    },
+    {
+      "question": "Citation Map 是否用網路搜尋補充說明？",
+      "header": "引用搜尋",
+      "multiSelect": false,
+      "options": [
+        {"label": "關閉 (預設)", "description": "Citation Map 只記錄素材來源，不補充外部說明"},
+        {"label": "啟用", "description": "在 Citation Map 中用 WebSearch 補充相關背景說明"}
+      ]
     }
   ]
 }
@@ -82,3 +100,5 @@
 | `MAX_ITERATIONS` | 審稿輪數 | 5 |
 | `DIAGRAM_METHOD` | 繪圖方式 | pptx_shapes |
 | `LAYOUT_REVIEW_ROUNDS` | 排版審查輪數 | 2（0 = 關閉）|
+| `REVIEW_WEB_SEARCH` | 審稿時是否啟用網路查證 | false |
+| `CITATION_WEB_SEARCH` | Citation Map 是否啟用網路補充 | false |

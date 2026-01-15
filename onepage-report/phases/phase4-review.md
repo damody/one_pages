@@ -209,6 +209,12 @@ Task(
 
 ## Phase 4.5：網路查證（如需要）
 
+**觸發條件**：`REVIEW_WEB_SEARCH = true` 且有 `web_research` 類型的 Issue
+
+若 `REVIEW_WEB_SEARCH = false`，跳過此步驟，將 `web_research` 類型的 Issue 改為 `user_input` 處理。
+
+---
+
 當有 Issue 需要網路查證時執行此步驟。
 
 ### 查證流程

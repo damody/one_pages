@@ -133,6 +133,281 @@ for svg_file in svg_files:
 
 ---
 
+### 6.3.0 產生 render_this.py 程式碼（必須執行）
+
+**步驟 1：讀取參考資料**
+
+執行前必須讀取以下檔案：
+
+```
+Read {skill_dir}/scripts/pptx_reference.py    # API 參考
+Read {skill_dir}/reference/gen_antilag2.py    # 完整範例
+Read {skill_dir}/reference/pptx-shapes.md     # 圖表繪製函數
+Read {skill_dir}/test_shapes_full.py          # ⭐ 完整佈局範例（主要參考）
+```
+
+⚠️ **重要**：`test_shapes_full.py` 是經過驗證的完整佈局範例，包含：
+- 元素追蹤與排版審查機制（track_element, layout_review）
+- 更多圖表繪製函數（draw_metric_cards, draw_comparison_table, draw_icon_list, draw_architecture）
+- 術語卡片函數（draw_glossary_card_with_diagram, draw_glossary_page_with_diagrams）
+- 文字方塊輔助函數（add_section_title, add_bullet_list, add_content_box）
+- 完整的主投影片和附錄佈局範例
+
+**請優先參考 test_shapes_full.py 的佈局和函數實作**。
+
+**步驟 2：根據 one_page.md 內容產生程式碼**
+
+使用 **Write 工具**產生 `./output/render_this.py`，程式碼結構如下：
+
+```python
+# -*- coding: utf-8 -*-
+"""
+由 onepage-report skill 自動產生
+"""
+
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from pptx.dml.color import RGBColor
+from pptx.enum.shapes import MSO_SHAPE
+
+# 顏色定義（MTK 風格）
+BG_COLOR = RGBColor(255, 249, 230)
+WHITE = RGBColor(255, 255, 255)
+DARK_GRAY = RGBColor(51, 51, 51)
+ACCENT_BLUE = RGBColor(70, 130, 180)
+ACCENT_ORANGE = RGBColor(230, 126, 34)
+ACCENT_GREEN = RGBColor(39, 174, 96)
+ACCENT_PURPLE = RGBColor(142, 68, 173)
+ACCENT_RED = RGBColor(192, 0, 0)
+
+# ===== 輔助函數（從 pptx_reference.py 複製完整函數） =====
+def set_cell_text(cell, text, font_size=10, bold=True, color=DARK_GRAY):
+    cell.text = text
+    for paragraph in cell.text_frame.paragraphs:
+        paragraph.font.size = Pt(font_size)
+        paragraph.font.bold = bold
+        paragraph.font.color.rgb = color
+        paragraph.font.name = "Microsoft JhengHei"
+
+def add_content_box(slide, left, top, width, height, title, content_lines, title_color=ACCENT_BLUE):
+    shape = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left, top, width, height)
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = WHITE
+    shape.line.color.rgb = RGBColor(220, 220, 220)
+    shape.line.width = Pt(1)
+
+    title_box = slide.shapes.add_textbox(left + Inches(0.08), top + Inches(0.03), width - Inches(0.16), Inches(0.3))
+    tf = title_box.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    p.text = title
+    p.font.size = Pt(12)
+    p.font.bold = True
+    p.font.color.rgb = title_color
+    p.font.name = "Microsoft JhengHei"
+
+    content_box = slide.shapes.add_textbox(left + Inches(0.08), top + Inches(0.28), width - Inches(0.16), height - Inches(0.32))
+    tf = content_box.text_frame
+    tf.word_wrap = True
+    for i, line in enumerate(content_lines):
+        if i == 0:
+            p = tf.paragraphs[0]
+        else:
+            p = tf.add_paragraph()
+        p.text = line
+        p.font.size = Pt(10)
+        p.font.bold = True
+        p.font.color.rgb = DARK_GRAY
+        p.font.name = "Microsoft JhengHei"
+        p.space_after = Pt(1)
+
+# ===== 圖表繪製函數（從 test_shapes_full.py 複製完整函數） =====
+
+# 圖表顏色
+COLOR_RED = RGBColor(244, 67, 54)       # 改善前/問題
+COLOR_GREEN = RGBColor(76, 175, 80)     # 改善後/成功
+COLOR_BLUE = RGBColor(33, 150, 243)     # 流程/節點
+COLOR_ORANGE = RGBColor(255, 152, 0)    # 警告/風險
+COLOR_PURPLE = RGBColor(156, 39, 176)   # 硬體/底層
+COLOR_GRAY_BG = RGBColor(245, 245, 245) # 區塊背景
+COLOR_ACCENT = RGBColor(0, 121, 107)    # 強調色 Teal
+
+def draw_before_after(slide, left, top, width, height, before_title, before_items, after_title, after_items):
+    """繪製前後對比圖 - 從 test_shapes_full.py 複製完整實作"""
+    # ... 複製 test_shapes_full.py 中的完整函數 ...
+    pass
+
+def draw_flow(slide, left, top, width, height, nodes):
+    """繪製橫向流程圖 - 從 test_shapes_full.py 複製完整實作"""
+    # ... 複製 test_shapes_full.py 中的完整函數 ...
+    pass
+
+def draw_architecture(slide, left, top, width, height, layers):
+    """繪製分層架構圖 - 從 test_shapes_full.py 複製完整實作"""
+    # ... 複製 test_shapes_full.py 中的完整函數 ...
+    pass
+
+def draw_metric_cards(slide, left, top, width, height, metrics):
+    """繪製指標卡片 - 從 test_shapes_full.py 複製完整實作"""
+    # ... 複製 test_shapes_full.py 中的完整函數 ...
+    pass
+
+def draw_comparison_table(slide, left, top, width, height, headers, rows):
+    """繪製對比表格 - 從 test_shapes_full.py 複製完整實作"""
+    # ... 複製 test_shapes_full.py 中的完整函數 ...
+    pass
+
+def draw_icon_list(slide, left, top, width, item_height, items):
+    """繪製帶圖標的列表 - 從 test_shapes_full.py 複製完整實作"""
+    # ... 複製 test_shapes_full.py 中的完整函數 ...
+    pass
+
+# ===== 文字方塊輔助函數（從 test_shapes_full.py 複製） =====
+
+def add_section_title(slide, left, top, width, text, color=COLOR_BLUE):
+    """加入區塊標題 - 從 test_shapes_full.py 複製完整實作"""
+    pass
+
+def add_bullet_list(slide, left, top, width, height, items, font_size=10):
+    """加入項目列表 - 從 test_shapes_full.py 複製完整實作"""
+    pass
+
+# ===== 術語卡片函數（從 test_shapes_full.py 複製，用於附錄頁）=====
+
+def draw_glossary_card_with_diagram(slide, left, top, width, height, term, desc, diagram_type, diagram_params):
+    """繪製帶示意圖的術語卡片 - 從 test_shapes_full.py 複製完整實作"""
+    pass
+
+def draw_glossary_page_with_diagrams(slide, title, terms):
+    """繪製一頁 6 格有圖片的術語卡片 - 從 test_shapes_full.py 複製完整實作"""
+    pass
+
+def draw_glossary_page_text_only(slide, title, terms):
+    """繪製一頁 16 格純文字術語卡片 - 從 test_shapes_full.py 複製完整實作"""
+    pass
+
+# ===== 主函數 =====
+def create_pptx():
+    # 1. 建立簡報
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+
+    # 2. 加入空白投影片
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+    # 3. 加入背景
+    background = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
+    background.fill.solid()
+    background.fill.fore_color.rgb = BG_COLOR
+    background.line.fill.background()
+
+    # 4. 加入標題（從 one_page.md 的 # 標題）
+    # 5. 加入副標題（從 one_page.md 的 > 引言）
+    # 6. 根據 one_page.md 的各個 ## 區塊，呼叫 add_content_box()
+    # 7. 加入表格（若有 table.md）
+
+    # 8. 根據 diagrams.md 繪製圖表
+    #    解析 diagrams.md 中每個圖表的類型和參數，呼叫對應的繪製函數
+    #    範例：
+    #    draw_before_after(slide, left=0.3, top=2.5, width=6.0, height=2.5,
+    #        before_title="改善前", before_items=["問題1", "問題2"],
+    #        after_title="改善後", after_items=["解決1", "解決2"])
+    #
+    #    draw_flow(slide, left=0.5, top=5.0, width=12.0, height=0.8,
+    #        nodes=[{"title": "步驟1", "desc": "說明"}, {"title": "步驟2", "desc": "說明"}])
+
+    # 9. 儲存
+    prs.save('one_page.pptx')
+    print("已生成：one_page.pptx")
+
+if __name__ == "__main__":
+    create_pptx()
+```
+
+**步驟 3：內容對應規則**
+
+| one_page.md 區塊 | render_this.py 對應 |
+|------------------|---------------------|
+| `# 主標題` | `add_textbox()` 標題區，字體 Pt(26) |
+| `> 副標題引言` | `add_textbox()` 副標題區，字體 Pt(11) |
+| `## 區塊標題` + 內容 | `add_content_box()` 圓角矩形區塊 |
+| 表格 | `add_table()` |
+| `[[術語]]` 標記 | 使用 `parse_text_with_terms()` 加入超連結 |
+
+**步驟 4：區塊顏色分配**
+
+根據區塊語意選擇顏色：
+
+| 區塊類型 | 顏色變數 |
+|----------|----------|
+| 技術背景、成功判定 | ACCENT_BLUE |
+| 問題、POC 設計 | ACCENT_ORANGE |
+| 效益、解決方案 | ACCENT_GREEN |
+| 架構、技術細節 | ACCENT_PURPLE |
+| 行動、決策 | ACCENT_RED |
+
+**步驟 5：使用 Write 工具寫出檔案**
+
+```
+Write(
+  file_path="./output/render_this.py",
+  content="... 完整 Python 程式碼 ..."
+)
+```
+
+⚠️ **重要**：必須用 Write 工具實際寫出檔案，不能只是在回覆中顯示程式碼。
+
+**步驟 6：解析 diagrams.md 並產生繪圖呼叫**
+
+diagrams.md 格式範例（pptx_shapes 模式）：
+
+```markdown
+## 主圖表
+
+- **類型**：before_after
+- **位置**：left=0.3, top=2.5, width=6.0, height=2.5
+
+### Shapes 參數
+
+```json
+{
+  "before_title": "改善前",
+  "before_items": ["問題1", "問題2"],
+  "after_title": "改善後",
+  "after_items": ["解決1", "解決2"]
+}
+```
+```
+
+對應產生的 Python 程式碼：
+
+```python
+draw_before_after(
+    slide=slide,
+    left=0.3, top=2.5, width=6.0, height=2.5,
+    before_title="改善前",
+    before_items=["問題1", "問題2"],
+    after_title="改善後",
+    after_items=["解決1", "解決2"]
+)
+```
+
+**圖表類型對應函數（從 test_shapes_full.py）：**
+
+| diagrams.md 類型 | 呼叫函數 | 用途 |
+|------------------|----------|------|
+| `before_after` | `draw_before_after()` | 前後對比圖 |
+| `flow` | `draw_flow()` | 橫向流程圖 |
+| `architecture` | `draw_architecture()` | 分層架構圖 |
+| `metric_cards` | `draw_metric_cards()` | 指標卡片（數字 + 說明）|
+| `comparison_table` | `draw_comparison_table()` | 對比表格 |
+| `icon_list` | `draw_icon_list()` | 帶圖標的列表（check/cross/warn）|
+| `glossary_with_diagrams` | `draw_glossary_page_with_diagrams()` | 術語頁（6 格有圖）|
+| `glossary_text_only` | `draw_glossary_page_text_only()` | 術語頁（16 格純文字）|
+
+---
+
 ## 6.3.1 Sub Agent 驗證步驟（必須執行）
 
 在執行 render_this.py 之前，必須呼叫 Task tool 讓獨立的 sub agent 檢查程式碼是否完整包含所有內容。
@@ -240,6 +515,108 @@ FOR round = 1 TO LAYOUT_REVIEW_ROUNDS:
 | 2 | 縮減間距 | 減少元素內部的 padding 和 line spacing |
 | 3 | 縮減內容 | 減少列表項目數量或縮短文字 |
 | 4 | 縮小字體 | 降低字體大小（最小 7pt） |
+
+---
+
+## 6.3.6 內容溢出審查（Content Overflow Review）
+
+**觸發條件**：`LAYOUT_REVIEW_ROUNDS > 0`
+
+在重疊審查通過後，檢查每個 content_box 的文字內容是否超出方塊範圍。
+
+### 審查流程
+
+```
+FOR each content_box in render_this.py:
+    1. 取得該區塊參數：
+       - box_width, box_height（英吋）
+       - font_size（pt）
+       - content_lines（字串陣列）
+
+    2. 計算「每行可容納字數」：
+       chars_per_line = (box_width - 0.12) * 72 / font_size * 0.7
+       （0.7 為中文字體寬度修正係數）
+
+    3. 計算「實際行數」：
+       FOR each line in content_lines:
+           IF len(line) == 0: actual_lines += 0.5
+           ELSE: actual_lines += ceil(len(line) / chars_per_line)
+
+    4. 計算「可用行數」：
+       available_height = box_height - 0.32  # 減去標題和 padding
+       line_height = (font_size + 1) / 72    # pt 轉英吋，含 space_after
+       available_lines = available_height / line_height
+
+    5. 若 actual_lines > available_lines：
+       → 標記為「溢出區塊」
+       → 先執行「合併短行」流程
+       → 若仍溢出，再執行「內容精簡」流程
+```
+
+### 「合併短行」流程（優先執行）
+
+先檢查是否有太短的行浪費右邊空間，嘗試合併：
+
+```
+FOR each line in content_lines:
+    IF len(line) < chars_per_line * 0.7:  # 行長度不到 70%
+        → 檢查與下一行合併後是否 <= chars_per_line
+        → 若不超過，用逗號或頓號連接
+        → 合併後若仍 < chars_per_line * 0.7，繼續嘗試合併下一行
+```
+
+**合併範例：**
+
+| 合併前 | 合併後 |
+|--------|--------|
+| `"• BufferQueue 緩衝延遲"` | `"• BufferQueue 緩衝延遲，遊戲畫好圖要交給 Android 處理，中間等待約 1-2 幀"` |
+| `"  遊戲畫好圖要交給 Android 處理"` | |
+| `"  中間等待約 1-2 幀"` | |
+
+**合併原則：**
+1. 同一個 bullet point 內的子句優先合併
+2. 用逗號「，」連接語意連貫的句子
+3. 合併後長度不超過 `chars_per_line`
+4. 空行（用於視覺分隔）保留不合併
+
+---
+
+### 「內容精簡」流程（合併後仍溢出時執行）
+
+當合併短行後仍溢出時，將白話文轉換為術語，減少文字量：
+
+| 原文範例 | 精簡後 |
+|----------|--------|
+| 「FPSGO（聯發科的幀率控制工具）無法感知引擎內部」 | 「[[FPSGO]] 無法感知引擎內部」 |
+| 「玩家按下螢幕到螢幕顏色改變的時間」 | 「[[Click-to-Photon]] 延遲」 |
+| 「幀與幀之間的時間差異變小，代表偶爾卡一下的情況減少」 | 「[[1% Low]] 改善」 |
+| 「把資料先存在離處理器很近的小容量高速記憶體中」 | 「[[cache]] 機制」 |
+
+### 精簡優先順序
+
+1. **優先精簡括號內的解釋**
+   - 括號內的文字通常是補充說明，可以移到術語解釋
+
+2. **優先精簡重複出現的概念**
+   - 同一區塊出現多次的概念，只需第一次保留白話，後續用術語
+
+3. **優先精簡非核心的說明**
+   - 保留：結論、數字、關鍵論點
+   - 精簡：背景解釋、類比說明
+
+### 每行字數參考表
+
+| 文字方塊寬度 | 字體大小 | 每行可容納中文字數 |
+|-------------|----------|-------------------|
+| 4.0 英吋 | 9pt | 約 28-30 字 |
+| 4.0 英吋 | 8pt | 約 32-34 字 |
+| 4.0 英吋 | 7pt | 約 36-38 字 |
+
+### 精簡後重新驗證
+
+精簡後需重新執行 6.3.1 Sub Agent 驗證，確保：
+1. 所有內容仍然完整（只是換了表達方式）
+2. 新增的 `[[術語]]` 標記都有對應的 glossary.md 條目
 
 ---
 
