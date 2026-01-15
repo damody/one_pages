@@ -11,6 +11,29 @@
 
 ---
 
+## ⭐ 完整範例參考
+
+**最重要**：所有 draw 函數的完整實作都在 `render_example.py` 中。
+
+```
+Read {skill_dir}/reference/render_example.py
+```
+
+該檔案包含經過驗證的完整函數：
+
+| 函數名稱 | 用途 | 行數 |
+|----------|------|------|
+| `draw_before_after_with_vertical_flow()` | 詳細版前後對比圖（垂直內部流程） | 262-526 |
+| `draw_flow()` | 橫向流程圖（支援時間標籤） | 532-598 |
+| `draw_architecture()` | 分層架構圖（支援高亮和元件） | 600-656 |
+| `draw_platform_compare()` | 上下平台對比圖 | 659-740 |
+| `draw_glossary_card()` | 單一術語卡片 | 746-779 |
+| `draw_glossary_page()` | 術語頁面（4x4 格局） | 782-809 |
+
+**使用方式**：產生 render_this.py 時，直接從 render_example.py 複製完整函數實作。
+
+---
+
 ## 顏色定義
 
 ```python

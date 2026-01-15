@@ -159,19 +159,33 @@ for svg_file in svg_files:
 
 ```
 Read {skill_dir}/scripts/pptx_reference.py    # API 參考
-Read {skill_dir}/reference/gen_antilag2.py    # 完整範例
-Read {skill_dir}/reference/pptx-shapes.md     # 圖表繪製函數
-Read {skill_dir}/test_shapes_full.py          # ⭐ 完整佈局範例（主要參考）
+Read {skill_dir}/reference/pptx-shapes.md     # 圖表繪製函數規範
+Read {skill_dir}/reference/render_example.py  # ⭐⭐ 最重要：完整的 draw 函數實作範例
+Read {skill_dir}/test_shapes_full.py          # 完整佈局範例
 ```
 
-⚠️ **重要**：`test_shapes_full.py` 是經過驗證的完整佈局範例，包含：
-- 元素追蹤與排版審查機制（track_element, layout_review）
-- 更多圖表繪製函數（draw_metric_cards, draw_comparison_table, draw_icon_list, draw_architecture）
-- 術語卡片函數（draw_glossary_card_with_diagram, draw_glossary_page_with_diagrams）
-- 文字方塊輔助函數（add_section_title, add_bullet_list, add_content_box）
-- 完整的主投影片和附錄佈局範例
+⚠️ **最重要**：`render_example.py` 是經過驗證的完整範例，包含：
 
-**請優先參考 test_shapes_full.py 的佈局和函數實作**。
+**圖表繪製函數（必須複製完整實作）：**
+- `draw_before_after_with_vertical_flow()` - 詳細版前後對比圖，帶有垂直內部流程節點
+- `draw_flow()` - 橫向流程圖，支援節點標題、說明、時間標籤
+- `draw_architecture()` - 分層架構圖，支援高亮層級和元件
+- `draw_platform_compare()` - 上下平台對比圖，支援內部項目和總結
+- `draw_glossary_card()` / `draw_glossary_page()` - 術語卡片（4x4 格局）
+
+**輔助函數：**
+- `add_background()` - 加入米色背景
+- `add_main_title()` - 加入主標題和副標題
+- `add_content_box()` - 加入圓角矩形內容方塊
+- `add_section_title()` - 加入區塊標題
+- `add_table()` - 加入表格
+- `set_cell_text()` - 設定表格儲存格文字
+
+**排版審查函數：**
+- `reset_element_tracker()` / `set_current_slide()` / `track_element()` - 元素追蹤
+- `check_overlaps()` / `layout_review()` - 重疊檢測
+
+**請優先從 render_example.py 複製 draw 函數的完整實作**，確保圖表繪製正確。
 
 **步驟 2：根據 one_page.md 內容產生程式碼**
 
@@ -641,6 +655,98 @@ FOR round = 1 TO LAYOUT_REVIEW_ROUNDS:
 | 2 | 縮減間距 | 減少元素內部的 padding 和 line spacing |
 | 3 | 縮減內容 | 減少列表項目數量或縮短文字 |
 | 4 | 縮小字體 | 降低字體大小（最小 7pt） |
+
+---
+
+## 6.3.5.1 圖表完整性驗證（Diagram Completeness Check）
+
+**觸發條件**：`LAYOUT_REVIEW_ROUNDS > 0`（與排版審查同時執行）
+
+**目的**：確保 diagrams.md 中描述的所有圖表都被正確繪製，不能被簡化或刪減。
+
+### 驗證項目
+
+| 檢查項目 | 說明 | 錯誤處理 |
+|----------|------|----------|
+| 圖表數量 | diagrams.md 中有幾個 `## ` 區塊，render_this.py 就要有幾個圖表繪製呼叫 | 補畫缺少的圖表 |
+| 圖表類型 | 每個圖表的類型（before_after, flow, architecture 等）是否正確 | 修正為正確類型 |
+| 內部流程節點 | 如果 diagrams.md 描述了內部流程節點，是否都有繪製 | 使用詳細版函數重繪 |
+| 箭頭標籤 | 如果 diagrams.md 描述了箭頭上的文字，是否有繪製 | 補上箭頭標籤 |
+| 附錄圖 | diagrams.md 的附錄圖是否都有對應的投影片 | 建立缺少的附錄頁 |
+
+### 驗證步驟
+
+```
+1. **解析 diagrams.md**
+   - 讀取 `./output/phase5/diagrams.md`（或 phase3/diagrams.md）
+   - 識別所有 `## ` 開頭的圖表區塊
+   - 提取每個圖表的：
+     - 圖表名稱（主圖 / 附錄圖 N）
+     - 類型（before_after / platform_compare / flow / architecture）
+     - 是否有「內部流程」描述（關鍵字：步驟、節點、流程、→）
+     - 是否有「箭頭上標文字」（關鍵字：箭頭上、連接、標註）
+     - 是否有「底部表格」（關鍵字：底部、對比表、總結表）
+
+2. **解析 render_this.py**
+   - 讀取 `./output/render_this.py`
+   - 識別所有 `draw_*` 函數呼叫
+   - 提取每個繪製呼叫的：
+     - 函數名稱（draw_before_after / draw_before_after_with_flow / draw_flow / draw_architecture 等）
+     - 參數內容
+
+3. **比對驗證**
+
+   FOR each diagram in diagrams.md:
+       a. 檢查 render_this.py 是否有對應的繪製呼叫
+       b. 如果 diagrams.md 有「內部流程」描述：
+          - 檢查是否使用詳細版函數（如 draw_before_after_with_flow 而非 draw_before_after）
+          - 檢查參數中是否有流程節點陣列
+       c. 如果 diagrams.md 有「箭頭標籤」描述：
+          - 檢查是否有 arrow_labels 參數
+
+       IF 發現問題：
+           → 記錄問題類型和位置
+           → 產生修正建議
+```
+
+### 輸出驗證報告
+
+```markdown
+## 圖表完整性驗證報告
+
+### diagrams.md 定義的圖表
+| # | 名稱 | 類型 | 有內部流程 | 有箭頭標籤 |
+|---|------|------|-----------|-----------|
+| 1 | 主圖 | before_after | ✓ | ✓ |
+| 2 | 附錄圖 1 | architecture | - | - |
+| 3 | 附錄圖 2 | platform_compare | ✓ | ✓ |
+
+### render_this.py 繪製的圖表
+| # | 函數呼叫 | 對應 diagrams.md |
+|---|----------|-----------------|
+| 1 | draw_before_after() | 主圖 |
+
+### 問題清單
+| 問題 | 說明 | 修正方式 |
+|------|------|----------|
+| 缺少附錄圖 1 | architecture 圖未繪製 | 新增 draw_architecture() 呼叫 |
+| 缺少附錄圖 2 | platform_compare 圖未繪製 | 新增 draw_platform_compare() 呼叫 |
+| 主圖過於簡化 | 使用 draw_before_after() 但 diagrams.md 有內部流程 | 改用 draw_before_after_with_flow() |
+```
+
+### 自動修正
+
+IF 有問題：
+1. 修改 render_this.py：
+   - 補上缺少的圖表繪製呼叫
+   - 將簡化版函數改為詳細版
+   - 補上缺少的參數（流程節點、箭頭標籤等）
+2. 重新執行 `python render_this.py`
+3. 回到步驟 1 重新驗證
+
+### 強制通過條件
+
+圖表完整性驗證**必須通過**才能完成 Phase 6，不允許跳過或忽略。
 
 ---
 

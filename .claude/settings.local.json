@@ -5,7 +5,8 @@
       "Bash(git commit:*)",
       "Bash(pip install:*)",
       "Bash(python test_convert_v2.py:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(ls:*)"
     ]
   }
 }
