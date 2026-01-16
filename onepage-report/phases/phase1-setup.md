@@ -89,6 +89,47 @@
 }
 ```
 
+---
+
+## 1.2 技術細節程度詢問
+
+在第一次詢問完成後，使用**第二次** AskUserQuestion 工具詢問技術細節保留程度：
+
+```json
+{
+  "questions": [
+    {
+      "question": "您希望報告保留多少技術細節？",
+      "header": "技術細節",
+      "multiSelect": false,
+      "options": [
+        {"label": "平衡版 (推薦)", "description": "主報告簡潔易懂，技術細節（執行緒、函數、表格）移到附錄投影片"},
+        {"label": "執行版", "description": "主報告極度精簡（國小生能懂），所有技術細節都在附錄"},
+        {"label": "技術版", "description": "主報告包含完整技術細節，不產生附錄（適合技術同仁）"}
+      ]
+    }
+  ]
+}
+```
+
+### 技術細節程度說明
+
+| 選項 | DETAIL_LEVEL 值 | 主報告 | 技術附錄 | 適用對象 |
+|------|----------------|--------|---------|---------|
+| 平衡版（推薦）| BALANCED | 簡化易懂，結論+推論 | 完整技術細節（執行緒/函數/表格）| 主管 + 技術同仁 |
+| 執行版 | EXECUTIVE | 極度精簡，每區塊 2-3 點 | 完整技術細節 | VP/Director 級別 |
+| 技術版 | TECHNICAL | 完整技術細節 | 不產生 | 技術同仁 |
+
+**範例差異**：
+
+| 內容 | EXECUTIVE | BALANCED | TECHNICAL |
+|------|-----------|----------|-----------|
+| 主報告描述 | 「Touch2Photon 降低 81%」| 「Touch2Photon 降低 81%，因減少處理器搬移次數」| 「Touch2Photon 降低 81%，執行緒 InputReader → InputDispatcher → ViewRootImpl → RenderThread...」|
+| 技術附錄 | 完整執行緒列表 + 函數呼叫鏈 + 技術表格 | 完整執行緒列表 + 函數呼叫鏈 + 技術表格 | 無（所有細節在主報告）|
+| 投影片數量 | 1 (主報告) + 2-3 (技術附錄) + N (附錄圖) + 1 (術語) | 1 (主報告) + 2-3 (技術附錄) + N (附錄圖) + 1 (術語) | 1 (主報告) + N (附錄圖) + 1 (術語) |
+
+---
+
 ### 進階設定解析
 
 根據使用者在「進階」問題的選擇：
@@ -108,6 +149,7 @@
 |------|------|--------|
 | `PURPOSE` | 報告目的 | - |
 | `EVIDENCE` | 佐證強度 | E0 |
+| `DETAIL_LEVEL` | 技術細節保留程度 | BALANCED |
 | `MAX_ITERATIONS` | 審稿輪數 | 5 |
 | `DIAGRAM_METHOD` | 繪圖方式 | pptx_shapes |
 | `LAYOUT_REVIEW_ROUNDS` | 排版審查輪數 | 2（0 = 關閉）|
@@ -130,6 +172,7 @@
 
 PURPOSE: {PURPOSE 的值}
 EVIDENCE: {EVIDENCE 的值}
+DETAIL_LEVEL: {DETAIL_LEVEL 的值}
 MAX_ITERATIONS: {MAX_ITERATIONS 的值}
 DIAGRAM_METHOD: {DIAGRAM_METHOD 的值}
 LAYOUT_REVIEW_ROUNDS: {LAYOUT_REVIEW_ROUNDS 的值}

@@ -7,6 +7,9 @@ from pptx.util import Inches, Pt
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.dml.color import RGBColor
+from pptx.chart.data import CategoryChartData
+from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
+from datetime import datetime, timedelta
 
 # === 顏色定義 ===
 COLOR_RED = RGBColor(244, 67, 54)
@@ -582,6 +585,684 @@ def draw_icon_list(slide, left, top, width, item_height, items):
         p.font.size = Pt(10)
         p.font.color.rgb = COLOR_TEXT
         p.font.name = FONT_NAME
+
+
+# ============================================================================
+# 原生圖表繪製函數（使用 python-pptx XL_CHART_TYPE）
+# ============================================================================
+
+def draw_line_chart(slide, left, top, width, height, title, categories, series,
+                    show_legend=True, show_data_labels=False, smooth=False):
+    """
+    繪製折線圖（原生圖表）
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        title: 圖表標題
+        categories: X 軸類別 ["Week 1", "Week 2", ...]
+        series: 資料序列 [{"name": "延遲", "values": [80, 65, 45, 30], "color": ...}, ...]
+        show_legend: 是否顯示圖例
+        show_data_labels: 是否顯示資料標籤
+        smooth: 是否平滑曲線
+    """
+    chart_data = CategoryChartData()
+    chart_data.categories = categories
+
+    for s in series:
+        chart_data.add_series(s["name"], s["values"])
+
+    chart_type = XL_CHART_TYPE.LINE_MARKERS_STACKED if not smooth else XL_CHART_TYPE.LINE_MARKERS
+
+    x, y, cx, cy = Inches(left), Inches(top), Inches(width), Inches(height)
+    graphic_frame = slide.shapes.add_chart(chart_type, x, y, cx, cy, chart_data)
+    chart = graphic_frame.chart
+
+    # 設定標題
+    chart.has_title = True
+    chart.chart_title.text_frame.paragraphs[0].text = title
+    chart.chart_title.text_frame.paragraphs[0].font.size = Pt(12)
+    chart.chart_title.text_frame.paragraphs[0].font.bold = True
+    chart.chart_title.text_frame.paragraphs[0].font.name = FONT_NAME
+
+    # 設定圖例
+    chart.has_legend = show_legend
+    if show_legend:
+        chart.legend.position = XL_LEGEND_POSITION.BOTTOM
+        chart.legend.include_in_layout = False
+
+    # 設定顏色
+    for i, s in enumerate(series):
+        if "color" in s and i < len(chart.series):
+            chart.series[i].format.line.color.rgb = s["color"]
+
+    return graphic_frame
+
+
+def draw_bar_chart(slide, left, top, width, height, title, categories, series,
+                   show_legend=True, show_data_labels=False, horizontal=False):
+    """
+    繪製長條圖（原生圖表）
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        title: 圖表標題
+        categories: X 軸類別 ["項目A", "項目B", ...]
+        series: 資料序列 [{"name": "數據", "values": [10, 20, 30], "color": ...}, ...]
+        show_legend: 是否顯示圖例
+        show_data_labels: 是否顯示資料標籤
+        horizontal: 是否水平顯示
+    """
+    chart_data = CategoryChartData()
+    chart_data.categories = categories
+
+    for s in series:
+        chart_data.add_series(s["name"], s["values"])
+
+    chart_type = XL_CHART_TYPE.BAR_CLUSTERED if horizontal else XL_CHART_TYPE.COLUMN_CLUSTERED
+
+    x, y, cx, cy = Inches(left), Inches(top), Inches(width), Inches(height)
+    graphic_frame = slide.shapes.add_chart(chart_type, x, y, cx, cy, chart_data)
+    chart = graphic_frame.chart
+
+    # 設定標題
+    chart.has_title = True
+    chart.chart_title.text_frame.paragraphs[0].text = title
+    chart.chart_title.text_frame.paragraphs[0].font.size = Pt(12)
+    chart.chart_title.text_frame.paragraphs[0].font.bold = True
+    chart.chart_title.text_frame.paragraphs[0].font.name = FONT_NAME
+
+    # 設定圖例
+    chart.has_legend = show_legend
+    if show_legend:
+        chart.legend.position = XL_LEGEND_POSITION.BOTTOM
+        chart.legend.include_in_layout = False
+
+    # 設定顏色
+    for i, s in enumerate(series):
+        if "color" in s and i < len(chart.series):
+            for point in chart.series[i].points:
+                point.format.fill.solid()
+                point.format.fill.fore_color.rgb = s["color"]
+
+    return graphic_frame
+
+
+def draw_pie_chart(slide, left, top, width, height, title, data,
+                   show_legend=True, show_percentage=True):
+    """
+    繪製圓餅圖（原生圖表）
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        title: 圖表標題
+        data: 資料 [{"name": "項目", "value": 45, "color": ...}, ...]
+        show_legend: 是否顯示圖例
+        show_percentage: 是否顯示百分比
+    """
+    chart_data = CategoryChartData()
+    chart_data.categories = [d["name"] for d in data]
+    chart_data.add_series("Values", [d["value"] for d in data])
+
+    x, y, cx, cy = Inches(left), Inches(top), Inches(width), Inches(height)
+    graphic_frame = slide.shapes.add_chart(XL_CHART_TYPE.PIE, x, y, cx, cy, chart_data)
+    chart = graphic_frame.chart
+
+    # 設定標題
+    chart.has_title = True
+    chart.chart_title.text_frame.paragraphs[0].text = title
+    chart.chart_title.text_frame.paragraphs[0].font.size = Pt(12)
+    chart.chart_title.text_frame.paragraphs[0].font.bold = True
+    chart.chart_title.text_frame.paragraphs[0].font.name = FONT_NAME
+
+    # 設定圖例
+    chart.has_legend = show_legend
+    if show_legend:
+        chart.legend.position = XL_LEGEND_POSITION.RIGHT
+        chart.legend.include_in_layout = False
+
+    # 設定顏色
+    if len(chart.series) > 0:
+        for i, d in enumerate(data):
+            if "color" in d and i < len(chart.series[0].points):
+                chart.series[0].points[i].format.fill.solid()
+                chart.series[0].points[i].format.fill.fore_color.rgb = d["color"]
+
+    return graphic_frame
+
+
+# ============================================================================
+# Shapes 組合圖表（甘特圖、矩陣圖、增強版架構圖）
+# ============================================================================
+
+def draw_gantt_chart(slide, left, top, width, height, title, tasks, milestones=None,
+                     time_unit="week", show_today_line=True, show_progress=True):
+    """
+    繪製甘特圖（使用 Shapes 組合）
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        title: 圖表標題
+        tasks: 任務列表 [{"name": "任務", "start": "2025-01-06", "end": "2025-01-19",
+                         "progress": 100, "color": COLOR_BLUE}, ...]
+        milestones: 里程碑 [{"name": "里程碑", "date": "2025-02-28", "color": COLOR_RED}, ...]
+        time_unit: 時間單位 "day" | "week" | "month"
+        show_today_line: 是否顯示今日線
+        show_progress: 是否顯示進度條
+    """
+    # 解析日期
+    def parse_date(date_str):
+        return datetime.strptime(date_str, "%Y-%m-%d")
+
+    # 計算時間範圍
+    all_dates = []
+    for t in tasks:
+        all_dates.append(parse_date(t["start"]))
+        all_dates.append(parse_date(t["end"]))
+    if milestones:
+        for m in milestones:
+            all_dates.append(parse_date(m["date"]))
+
+    min_date = min(all_dates)
+    max_date = max(all_dates)
+    total_days = (max_date - min_date).days + 1
+
+    # 佈局參數
+    title_height = 0.35
+    header_height = 0.3
+    name_col_width = 1.8
+    chart_left = left + name_col_width
+    chart_width = width - name_col_width
+    task_count = len(tasks)
+    task_height = (height - title_height - header_height) / task_count if task_count > 0 else 0.5
+
+    # 標題
+    title_box = slide.shapes.add_textbox(
+        Inches(left), Inches(top),
+        Inches(width), Inches(title_height)
+    )
+    tf = title_box.text_frame
+    p = tf.paragraphs[0]
+    p.text = title
+    p.font.size = Pt(12)
+    p.font.bold = True
+    p.font.color.rgb = COLOR_TEXT
+    p.font.name = FONT_NAME
+
+    # 時間軸標題區
+    header_top = top + title_height
+
+    # 計算時間刻度
+    if time_unit == "week":
+        # 每週一個刻度
+        current = min_date
+        ticks = []
+        while current <= max_date:
+            ticks.append(current)
+            current += timedelta(days=7)
+        if ticks[-1] < max_date:
+            ticks.append(max_date)
+    else:
+        # 每天或每月（簡化為等分 5-8 個刻度）
+        tick_count = min(8, total_days)
+        ticks = [min_date + timedelta(days=i * total_days // tick_count) for i in range(tick_count + 1)]
+
+    # 繪製時間刻度
+    for i, tick_date in enumerate(ticks[:-1]):
+        tick_x = chart_left + (tick_date - min_date).days / total_days * chart_width
+        next_tick_x = chart_left + (ticks[i + 1] - min_date).days / total_days * chart_width if i + 1 < len(ticks) else chart_left + chart_width
+
+        # 刻度標籤
+        label_box = slide.shapes.add_textbox(
+            Inches(tick_x), Inches(header_top),
+            Inches(next_tick_x - tick_x), Inches(header_height)
+        )
+        tf = label_box.text_frame
+        p = tf.paragraphs[0]
+        p.text = tick_date.strftime("%m/%d")
+        p.font.size = Pt(7)
+        p.font.color.rgb = COLOR_GRAY_DARK
+        p.font.name = FONT_NAME
+        p.alignment = PP_ALIGN.CENTER
+
+        # 垂直分隔線
+        line = slide.shapes.add_shape(
+            MSO_SHAPE.RECTANGLE,
+            Inches(tick_x), Inches(header_top + header_height),
+            Inches(0.01), Inches(height - title_height - header_height)
+        )
+        line.fill.solid()
+        line.fill.fore_color.rgb = RGBColor(220, 220, 220)
+        line.line.fill.background()
+
+    # 繪製任務
+    task_area_top = header_top + header_height
+    for i, task in enumerate(tasks):
+        task_top = task_area_top + i * task_height
+        task_start = parse_date(task["start"])
+        task_end = parse_date(task["end"])
+        color = task.get("color", COLOR_BLUE)
+        progress = task.get("progress", 0)
+
+        # 任務名稱
+        name_box = slide.shapes.add_textbox(
+            Inches(left), Inches(task_top),
+            Inches(name_col_width - 0.1), Inches(task_height)
+        )
+        tf = name_box.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.text = task["name"]
+        p.font.size = Pt(8)
+        p.font.color.rgb = COLOR_TEXT
+        p.font.name = FONT_NAME
+
+        # 計算任務條位置
+        start_offset = (task_start - min_date).days / total_days
+        end_offset = (task_end - min_date).days / total_days
+        bar_left = chart_left + start_offset * chart_width
+        bar_width = (end_offset - start_offset) * chart_width
+        bar_top = task_top + task_height * 0.2
+        bar_height = task_height * 0.6
+
+        # 任務背景條
+        bg_bar = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            Inches(bar_left), Inches(bar_top),
+            Inches(bar_width), Inches(bar_height)
+        )
+        bg_bar.fill.solid()
+        bg_bar.fill.fore_color.rgb = RGBColor(230, 230, 230)
+        bg_bar.line.fill.background()
+
+        # 進度條
+        if show_progress and progress > 0:
+            progress_width = bar_width * progress / 100
+            progress_bar = slide.shapes.add_shape(
+                MSO_SHAPE.ROUNDED_RECTANGLE,
+                Inches(bar_left), Inches(bar_top),
+                Inches(progress_width), Inches(bar_height)
+            )
+            progress_bar.fill.solid()
+            progress_bar.fill.fore_color.rgb = color
+            progress_bar.line.fill.background()
+
+    # 繪製里程碑
+    if milestones:
+        for m in milestones:
+            m_date = parse_date(m["date"])
+            m_offset = (m_date - min_date).days / total_days
+            m_x = chart_left + m_offset * chart_width
+            m_color = m.get("color", COLOR_RED)
+
+            # 菱形
+            diamond = slide.shapes.add_shape(
+                MSO_SHAPE.DIAMOND,
+                Inches(m_x - 0.1), Inches(task_area_top - 0.05),
+                Inches(0.2), Inches(0.2)
+            )
+            diamond.fill.solid()
+            diamond.fill.fore_color.rgb = m_color
+            diamond.line.fill.background()
+
+    # 今日線
+    if show_today_line:
+        today = datetime.now()
+        if min_date <= today <= max_date:
+            today_offset = (today - min_date).days / total_days
+            today_x = chart_left + today_offset * chart_width
+            today_line = slide.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE,
+                Inches(today_x), Inches(header_top),
+                Inches(0.02), Inches(height - title_height)
+            )
+            today_line.fill.solid()
+            today_line.fill.fore_color.rgb = COLOR_RED
+            today_line.line.fill.background()
+
+
+def draw_architecture_enhanced(slide, left, top, width, height, layers,
+                                connections=None, annotations=None):
+    """
+    繪製增強版系統架構圖
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        layers: 分層定義 [{"name": "層名", "color": ..., "components": [
+            {"name": "組件", "highlight": False, "highlight_label": ""}, ...]}, ...]
+        connections: 連接線 [{"from": "組件A", "to": "組件B", "label": "...", "style": "arrow"}, ...]
+        annotations: 註解 [{"target": "組件", "text": "說明", "position": "right"}, ...]
+    """
+    component_positions = {}  # 記錄每個組件的位置
+
+    layer_count = len(layers)
+    layer_gap = 0.15
+    layer_height = (height - layer_gap * (layer_count - 1)) / layer_count
+
+    for i, layer in enumerate(layers):
+        y = top + i * (layer_height + layer_gap)
+        color = layer.get("color", COLOR_BLUE)
+        name = layer.get("name", "")
+
+        # 層背景
+        layer_box = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            Inches(left), Inches(y),
+            Inches(width), Inches(layer_height)
+        )
+        layer_box.fill.solid()
+        # 使用淺灰色背景搭配有色邊框
+        layer_box.fill.fore_color.rgb = COLOR_GRAY_BG
+        layer_box.line.color.rgb = color
+        layer_box.line.width = Pt(2)
+
+        # 層名稱（左側標籤）
+        name_width = 1.2
+        name_box = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            Inches(left + 0.05), Inches(y + 0.05),
+            Inches(name_width - 0.1), Inches(layer_height - 0.1)
+        )
+        name_box.fill.solid()
+        name_box.fill.fore_color.rgb = color
+        name_box.line.fill.background()
+
+        tf = name_box.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.text = name
+        p.font.size = Pt(9)
+        p.font.bold = True
+        p.font.color.rgb = COLOR_WHITE
+        p.font.name = FONT_NAME
+        p.alignment = PP_ALIGN.CENTER
+
+        # 組件
+        components = layer.get("components", [])
+        if components:
+            comp_area_width = width - name_width - 0.2
+            comp_width = comp_area_width / len(components) if len(components) > 0 else 1
+            comp_height = layer_height - 0.2
+
+            for j, comp in enumerate(components):
+                comp_name = comp["name"] if isinstance(comp, dict) else comp
+                highlight = comp.get("highlight", False) if isinstance(comp, dict) else False
+                highlight_label = comp.get("highlight_label", "") if isinstance(comp, dict) else ""
+
+                cx = left + name_width + 0.1 + j * comp_width
+                cy = y + 0.1
+
+                # 組件方塊
+                comp_box = slide.shapes.add_shape(
+                    MSO_SHAPE.ROUNDED_RECTANGLE,
+                    Inches(cx), Inches(cy),
+                    Inches(comp_width - 0.1), Inches(comp_height)
+                )
+                comp_box.fill.solid()
+                comp_box.fill.fore_color.rgb = COLOR_WHITE
+                comp_box.line.color.rgb = color
+                comp_box.line.width = Pt(1)
+
+                # 高亮處理
+                if highlight:
+                    comp_box.line.color.rgb = COLOR_ORANGE
+                    comp_box.line.width = Pt(3)
+
+                    # 高亮標籤
+                    if highlight_label:
+                        label_box = slide.shapes.add_textbox(
+                            Inches(cx), Inches(cy - 0.18),
+                            Inches(comp_width - 0.1), Inches(0.18)
+                        )
+                        tf = label_box.text_frame
+                        p = tf.paragraphs[0]
+                        p.text = highlight_label
+                        p.font.size = Pt(6)
+                        p.font.bold = True
+                        p.font.color.rgb = COLOR_ORANGE
+                        p.font.name = FONT_NAME
+                        p.alignment = PP_ALIGN.CENTER
+
+                # 組件名稱
+                tf = comp_box.text_frame
+                tf.word_wrap = True
+                p = tf.paragraphs[0]
+                p.text = comp_name
+                p.font.size = Pt(8)
+                p.font.color.rgb = COLOR_TEXT
+                p.font.name = FONT_NAME
+                p.alignment = PP_ALIGN.CENTER
+
+                # 記錄位置
+                component_positions[comp_name] = {
+                    "left": cx,
+                    "top": cy,
+                    "width": comp_width - 0.1,
+                    "height": comp_height,
+                    "center_x": cx + (comp_width - 0.1) / 2,
+                    "center_y": cy + comp_height / 2,
+                    "bottom": cy + comp_height
+                }
+
+    # 繪製連接線
+    if connections:
+        for conn in connections:
+            from_pos = component_positions.get(conn["from"])
+            to_pos = component_positions.get(conn["to"])
+
+            if from_pos and to_pos:
+                # 計算連線的起點和終點
+                start_x = from_pos["center_x"]
+                start_y = from_pos["bottom"]
+                end_x = to_pos["center_x"]
+                end_y = to_pos["top"]
+
+                # 使用連接器形狀
+                style = conn.get("style", "arrow")
+                label = conn.get("label", "")
+
+                # 垂直線
+                if abs(start_x - end_x) < 0.1:
+                    line = slide.shapes.add_shape(
+                        MSO_SHAPE.RECTANGLE,
+                        Inches(start_x - 0.01), Inches(start_y),
+                        Inches(0.02), Inches(end_y - start_y)
+                    )
+                    line.fill.solid()
+                    line.fill.fore_color.rgb = COLOR_GRAY_DARK
+                    line.line.fill.background()
+                else:
+                    # 斜線（用小箭頭表示）
+                    arrow = slide.shapes.add_shape(
+                        MSO_SHAPE.DOWN_ARROW,
+                        Inches(min(start_x, end_x)), Inches(start_y),
+                        Inches(abs(end_x - start_x) + 0.1), Inches(end_y - start_y)
+                    )
+                    arrow.fill.solid()
+                    arrow.fill.fore_color.rgb = COLOR_GRAY_DARK
+                    arrow.line.fill.background()
+
+                # 連線標籤
+                if label:
+                    label_x = (start_x + end_x) / 2 - 0.3
+                    label_y = (start_y + end_y) / 2 - 0.1
+                    label_box = slide.shapes.add_textbox(
+                        Inches(label_x), Inches(label_y),
+                        Inches(0.6), Inches(0.2)
+                    )
+                    tf = label_box.text_frame
+                    p = tf.paragraphs[0]
+                    p.text = label
+                    p.font.size = Pt(6)
+                    p.font.color.rgb = COLOR_GRAY_DARK
+                    p.font.name = FONT_NAME
+                    p.alignment = PP_ALIGN.CENTER
+
+    return component_positions
+
+
+def draw_matrix_chart(slide, left, top, width, height, title, x_axis, y_axis, items, quadrant_labels=None):
+    """
+    繪製矩陣圖（風險評估/優先級矩陣）
+
+    Args:
+        slide: 投影片物件
+        left, top: 左上角位置（吋）
+        width, height: 寬高（吋）
+        title: 圖表標題
+        x_axis: {"label": "影響程度", "values": ["低", "中", "高"]}
+        y_axis: {"label": "發生機率", "values": ["低", "中", "高"]}
+        items: [{"name": "風險項", "x": 2, "y": 1, "color": COLOR_ORANGE}, ...]
+        quadrant_labels: 象限標籤 {"high-high": "高優先", "low-low": "低優先", ...}
+    """
+    title_height = 0.35
+    axis_label_width = 0.4
+    axis_value_height = 0.25
+
+    chart_left = left + axis_label_width + 0.1
+    chart_top = top + title_height
+    chart_width = width - axis_label_width - 0.2
+    chart_height = height - title_height - axis_value_height - 0.1
+
+    x_count = len(x_axis["values"])
+    y_count = len(y_axis["values"])
+    cell_width = chart_width / x_count
+    cell_height = chart_height / y_count
+
+    # 標題
+    title_box = slide.shapes.add_textbox(
+        Inches(left), Inches(top),
+        Inches(width), Inches(title_height)
+    )
+    tf = title_box.text_frame
+    p = tf.paragraphs[0]
+    p.text = title
+    p.font.size = Pt(12)
+    p.font.bold = True
+    p.font.color.rgb = COLOR_TEXT
+    p.font.name = FONT_NAME
+
+    # Y 軸標籤
+    y_label_box = slide.shapes.add_textbox(
+        Inches(left), Inches(chart_top + chart_height / 2 - 0.2),
+        Inches(axis_label_width), Inches(0.4)
+    )
+    tf = y_label_box.text_frame
+    p = tf.paragraphs[0]
+    p.text = y_axis["label"]
+    p.font.size = Pt(8)
+    p.font.bold = True
+    p.font.color.rgb = COLOR_TEXT
+    p.font.name = FONT_NAME
+    p.alignment = PP_ALIGN.CENTER
+
+    # X 軸標籤
+    x_label_box = slide.shapes.add_textbox(
+        Inches(chart_left + chart_width / 2 - 0.4), Inches(top + height - 0.25),
+        Inches(0.8), Inches(0.25)
+    )
+    tf = x_label_box.text_frame
+    p = tf.paragraphs[0]
+    p.text = x_axis["label"]
+    p.font.size = Pt(8)
+    p.font.bold = True
+    p.font.color.rgb = COLOR_TEXT
+    p.font.name = FONT_NAME
+    p.alignment = PP_ALIGN.CENTER
+
+    # 繪製格子和軸值
+    for yi, y_val in enumerate(reversed(y_axis["values"])):  # 從下到上
+        for xi, x_val in enumerate(x_axis["values"]):
+            cell_x = chart_left + xi * cell_width
+            cell_y = chart_top + yi * cell_height
+
+            # 計算背景色（越高越紅）
+            risk_level = (xi + (y_count - 1 - yi)) / (x_count + y_count - 2)
+            bg_r = int(232 + (255 - 232) * risk_level)
+            bg_g = int(245 - (245 - 200) * risk_level)
+            bg_b = int(233 - (233 - 200) * risk_level)
+
+            cell = slide.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE,
+                Inches(cell_x), Inches(cell_y),
+                Inches(cell_width), Inches(cell_height)
+            )
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor(bg_r, bg_g, bg_b)
+            cell.line.color.rgb = RGBColor(200, 200, 200)
+            cell.line.width = Pt(0.5)
+
+    # Y 軸刻度值
+    for yi, y_val in enumerate(reversed(y_axis["values"])):
+        val_box = slide.shapes.add_textbox(
+            Inches(left + axis_label_width - 0.3), Inches(chart_top + yi * cell_height + cell_height / 2 - 0.1),
+            Inches(0.3), Inches(0.2)
+        )
+        tf = val_box.text_frame
+        p = tf.paragraphs[0]
+        p.text = y_val
+        p.font.size = Pt(7)
+        p.font.color.rgb = COLOR_TEXT
+        p.font.name = FONT_NAME
+        p.alignment = PP_ALIGN.RIGHT
+
+    # X 軸刻度值
+    for xi, x_val in enumerate(x_axis["values"]):
+        val_box = slide.shapes.add_textbox(
+            Inches(chart_left + xi * cell_width), Inches(chart_top + chart_height),
+            Inches(cell_width), Inches(axis_value_height)
+        )
+        tf = val_box.text_frame
+        p = tf.paragraphs[0]
+        p.text = x_val
+        p.font.size = Pt(7)
+        p.font.color.rgb = COLOR_TEXT
+        p.font.name = FONT_NAME
+        p.alignment = PP_ALIGN.CENTER
+
+    # 繪製項目點
+    for item in items:
+        ix = item["x"]  # 0-indexed
+        iy = item["y"]  # 0-indexed
+        color = item.get("color", COLOR_ORANGE)
+
+        # 計算位置（y 軸需要反轉）
+        point_x = chart_left + (ix + 0.5) * cell_width - 0.15
+        point_y = chart_top + (y_count - 1 - iy + 0.5) * cell_height - 0.15
+
+        # 項目圓點
+        point = slide.shapes.add_shape(
+            MSO_SHAPE.OVAL,
+            Inches(point_x), Inches(point_y),
+            Inches(0.3), Inches(0.3)
+        )
+        point.fill.solid()
+        point.fill.fore_color.rgb = color
+        point.line.color.rgb = COLOR_WHITE
+        point.line.width = Pt(2)
+
+        # 項目名稱
+        name_box = slide.shapes.add_textbox(
+            Inches(point_x - 0.2), Inches(point_y + 0.32),
+            Inches(0.7), Inches(0.2)
+        )
+        tf = name_box.text_frame
+        p = tf.paragraphs[0]
+        p.text = item["name"]
+        p.font.size = Pt(6)
+        p.font.bold = True
+        p.font.color.rgb = COLOR_TEXT
+        p.font.name = FONT_NAME
+        p.alignment = PP_ALIGN.CENTER
 
 
 # ============================================================================
@@ -1969,20 +2650,196 @@ if __name__ == "__main__":
     draw_glossary_page_text_only(slide5, "附錄 D：術語速查表（純文字版 - 16 格）", terms_text_only)
 
     # ========================================================================
+    # 第 6 頁：新增圖表類型展示（折線圖、長條圖、圓餅圖）
+    # ========================================================================
+    slide6 = prs.slides.add_slide(prs.slide_layouts[6])
+    set_current_slide(5)
+
+    title = slide6.shapes.add_textbox(Inches(0.3), Inches(0.15), Inches(12.7), Inches(0.4))
+    tf = title.text_frame
+    p = tf.paragraphs[0]
+    p.text = "附錄 E：原生圖表類型展示"
+    p.font.size = Pt(18)
+    p.font.bold = True
+    p.font.color.rgb = COLOR_TEXT
+    p.font.name = FONT_NAME
+
+    # 折線圖
+    add_section_title(slide6, 0.3, 0.6, 4.0, "折線圖 - 效能趨勢")
+    draw_line_chart(
+        slide=slide6,
+        left=0.3, top=0.95, width=4.0, height=2.8,
+        title="延遲變化趨勢",
+        categories=["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"],
+        series=[
+            {"name": "改善前 (ms)", "values": [80, 75, 78, 82, 79], "color": COLOR_RED},
+            {"name": "改善後 (ms)", "values": [80, 45, 30, 20, 15], "color": COLOR_GREEN}
+        ],
+        show_legend=True
+    )
+
+    # 長條圖
+    add_section_title(slide6, 4.6, 0.6, 4.0, "長條圖 - 遊戲對比")
+    draw_bar_chart(
+        slide=slide6,
+        left=4.6, top=0.95, width=4.0, height=2.8,
+        title="各遊戲延遲對比",
+        categories=["王者榮耀", "原神", "PUBG", "Free Fire"],
+        series=[
+            {"name": "改善前", "values": [80, 65, 70, 55], "color": COLOR_RED},
+            {"name": "改善後", "values": [25, 20, 22, 18], "color": COLOR_GREEN}
+        ],
+        show_legend=True
+    )
+
+    # 圓餅圖
+    add_section_title(slide6, 8.9, 0.6, 4.0, "圓餅圖 - 延遲來源")
+    draw_pie_chart(
+        slide=slide6,
+        left=8.9, top=0.95, width=4.0, height=2.8,
+        title="延遲來源分布",
+        data=[
+            {"name": "Frame Queue", "value": 45, "color": COLOR_RED},
+            {"name": "GPU 渲染", "value": 30, "color": COLOR_BLUE},
+            {"name": "顯示路徑", "value": 15, "color": COLOR_GREEN},
+            {"name": "其他", "value": 10, "color": COLOR_GRAY_DARK}
+        ],
+        show_legend=True
+    )
+
+    # 矩陣圖
+    add_section_title(slide6, 0.3, 3.9, 6.0, "矩陣圖 - 風險評估")
+    draw_matrix_chart(
+        slide=slide6,
+        left=0.3, top=4.2, width=5.5, height=3.0,
+        title="POC 風險評估矩陣",
+        x_axis={"label": "影響程度", "values": ["低", "中", "高"]},
+        y_axis={"label": "發生機率", "values": ["低", "中", "高"]},
+        items=[
+            {"name": "SDK 整合", "x": 1, "y": 1, "color": COLOR_ORANGE},
+            {"name": "效能", "x": 2, "y": 0, "color": COLOR_GREEN},
+            {"name": "廠商配合", "x": 2, "y": 2, "color": COLOR_RED},
+            {"name": "功耗", "x": 0, "y": 1, "color": COLOR_BLUE}
+        ]
+    )
+
+    # 說明文字
+    note_box = slide6.shapes.add_textbox(Inches(6.2), Inches(4.2), Inches(6.5), Inches(3.0))
+    tf = note_box.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    p.text = "圖表類型說明"
+    p.font.size = Pt(11)
+    p.font.bold = True
+    p.font.color.rgb = COLOR_BLUE
+    p.font.name = FONT_NAME
+
+    notes = [
+        "• 折線圖：使用 XL_CHART_TYPE.LINE_MARKERS",
+        "• 長條圖：使用 XL_CHART_TYPE.COLUMN_CLUSTERED",
+        "• 圓餅圖：使用 XL_CHART_TYPE.PIE",
+        "• 矩陣圖：使用 Shapes 組合繪製",
+        "• 所有原生圖表可在 PowerPoint 中編輯資料"
+    ]
+    for note in notes:
+        p = tf.add_paragraph()
+        p.text = note
+        p.font.size = Pt(9)
+        p.font.color.rgb = COLOR_TEXT
+        p.font.name = FONT_NAME
+
+    # ========================================================================
+    # 第 7 頁：甘特圖與增強版架構圖
+    # ========================================================================
+    slide7 = prs.slides.add_slide(prs.slide_layouts[6])
+    set_current_slide(6)
+
+    title = slide7.shapes.add_textbox(Inches(0.3), Inches(0.15), Inches(12.7), Inches(0.4))
+    tf = title.text_frame
+    p = tf.paragraphs[0]
+    p.text = "附錄 F：甘特圖與增強版架構圖"
+    p.font.size = Pt(18)
+    p.font.bold = True
+    p.font.color.rgb = COLOR_TEXT
+    p.font.name = FONT_NAME
+
+    # 甘特圖
+    add_section_title(slide7, 0.3, 0.6, 12.7, "甘特圖 - POC 專案進度")
+    draw_gantt_chart(
+        slide=slide7,
+        left=0.3, top=0.95, width=12.7, height=2.8,
+        title="Anti-Lag SDK POC 開發時程",
+        tasks=[
+            {"name": "需求分析與設計", "start": "2025-01-06", "end": "2025-01-12", "progress": 100, "color": COLOR_BLUE},
+            {"name": "SDK 原型開發", "start": "2025-01-13", "end": "2025-01-26", "progress": 80, "color": COLOR_GREEN},
+            {"name": "SurfaceFlinger 整合", "start": "2025-01-20", "end": "2025-02-02", "progress": 50, "color": COLOR_ORANGE},
+            {"name": "整合測試", "start": "2025-02-03", "end": "2025-02-16", "progress": 20, "color": COLOR_PURPLE},
+            {"name": "遊戲驗證", "start": "2025-02-10", "end": "2025-02-28", "progress": 0, "color": COLOR_ACCENT}
+        ],
+        milestones=[
+            {"name": "原型完成", "date": "2025-01-26", "color": COLOR_BLUE},
+            {"name": "POC 完成", "date": "2025-02-28", "color": COLOR_RED}
+        ],
+        time_unit="week",
+        show_today_line=False,
+        show_progress=True
+    )
+
+    # 增強版架構圖
+    add_section_title(slide7, 0.3, 3.9, 12.7, "增強版架構圖 - Anti-Lag SDK 系統架構")
+    draw_architecture_enhanced(
+        slide=slide7,
+        left=0.3, top=4.2, width=12.7, height=3.0,
+        layers=[
+            {
+                "name": "應用層",
+                "color": COLOR_BLUE,
+                "components": [
+                    {"name": "遊戲 App"},
+                    {"name": "Anti-Lag SDK", "highlight": True, "highlight_label": "新增"},
+                    {"name": "其他 App"}
+                ]
+            },
+            {
+                "name": "框架層",
+                "color": COLOR_GREEN,
+                "components": [
+                    {"name": "SurfaceFlinger", "highlight": True, "highlight_label": "修改"},
+                    {"name": "BufferQueue"},
+                    {"name": "HWComposer"}
+                ]
+            },
+            {
+                "name": "驅動層",
+                "color": COLOR_ORANGE,
+                "components": [
+                    {"name": "GPU Driver"},
+                    {"name": "Display Driver"}
+                ]
+            }
+        ],
+        connections=[
+            {"from": "Anti-Lag SDK", "to": "SurfaceFlinger", "label": "sync", "style": "arrow"}
+        ]
+    )
+
+    # ========================================================================
     # 排版審查
     # ========================================================================
     review_result = layout_review(max_rounds=2)
 
     # 儲存
-    output_path = "./test_shapes_full_v4.pptx"
+    output_path = "./test_shapes_full_v5.pptx"
     prs.save(output_path)
     print(f"\n完整測試完成！已儲存至：{output_path}")
-    print("包含 5 頁投影片：")
+    print("包含 7 頁投影片：")
     print("  1. 主投影片 - 完整報告佈局")
     print("  2. 附錄 A - 架構圖 + 對比表")
     print("  3. 附錄 B - POC 實驗設計")
     print("  4. 附錄 C - 術語解釋（有圖片版 6 格）")
     print("  5. 附錄 D - 術語速查表（純文字版 16 格）")
+    print("  6. 附錄 E - 原生圖表類型展示（折線圖、長條圖、圓餅圖、矩陣圖）")
+    print("  7. 附錄 F - 甘特圖與增強版架構圖")
 
     if not review_result["passed"]:
         print(f"\n⚠️ 警告：排版審查發現 {review_result['total_overlaps']} 處重疊")

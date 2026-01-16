@@ -37,6 +37,68 @@ COLOR_PINK = RGBColor(233, 30, 99)
 FONT_NAME = "Microsoft JhengHei"
 
 # =============================================================================
+# 流程圖佈局配置與自適應邏輯
+# =============================================================================
+
+FLOW_LAYOUT_CONFIG = {
+    "max_horizontal_nodes": 6,        # 超過此數量強制縱向
+    "min_node_width": 0.8,            # 最小節點寬度（英吋）
+    "min_gap": 0.08,                  # 最小節點間距（英吋）
+    "default_gap": 0.12,              # 預設節點間距（英吋）
+    "char_width_avg": 0.09,           # 平均字元寬度估算（英吋，8pt）
+    "padding_horizontal": 0.2,        # 節點內水平留白（英吋）
+}
+
+def calculate_text_width(text):
+    """計算文字寬度（中文=2，英文=1）"""
+    width = 0
+    for char in text:
+        if ord(char) > 0x4E00 and ord(char) < 0x9FFF:  # CJK 範圍
+            width += 2
+        else:
+            width += 1
+    return width
+
+def estimate_node_min_width(node):
+    """估算單個節點的最小寬度"""
+    if isinstance(node, dict):
+        title = node.get("title", "")
+        desc = node.get("desc", "")
+        time_label = node.get("time", "")
+    else:
+        title = str(node)
+        desc = ""
+        time_label = ""
+
+    max_text = max([title, desc, time_label], key=lambda x: calculate_text_width(x))
+    text_width_chars = calculate_text_width(max_text)
+    estimated_width = text_width_chars * FLOW_LAYOUT_CONFIG["char_width_avg"] + FLOW_LAYOUT_CONFIG["padding_horizontal"]
+
+    return max(estimated_width, FLOW_LAYOUT_CONFIG["min_node_width"])
+
+def should_use_vertical_flow(nodes, width, min_node_width=0.8):
+    """判斷是否應該使用縱向流程圖"""
+    node_count = len(nodes)
+
+    # 條件 1：節點數量過多
+    if node_count > FLOW_LAYOUT_CONFIG["max_horizontal_nodes"]:
+        return (True, f"節點數量 {node_count} > {FLOW_LAYOUT_CONFIG['max_horizontal_nodes']}")
+
+    # 條件 2：計算動態調整後的節點寬度
+    min_gap = FLOW_LAYOUT_CONFIG["min_gap"]
+    calculated_node_width = (width - min_gap * (node_count - 1)) / node_count
+
+    if calculated_node_width < min_node_width:
+        return (True, f"計算節點寬度 {calculated_node_width:.2f} < 最小寬度 {min_node_width}")
+
+    # 條件 3：檢查文字長度
+    max_required_width = max(estimate_node_min_width(node) for node in nodes)
+    if max_required_width > calculated_node_width:
+        return (True, f"文字所需寬度 {max_required_width:.2f} > 節點寬度 {calculated_node_width:.2f}")
+
+    return (False, "橫向佈局可行")
+
+# =============================================================================
 # 元素追蹤與排版審查
 # =============================================================================
 
@@ -530,9 +592,19 @@ def draw_before_after_with_vertical_flow(slide, left, top, width, height,
 # =============================================================================
 
 def draw_flow(slide, left, top, width, height, nodes):
-    """繪製橫向流程圖"""
+    """繪製橫向流程圖（動態調整版本）"""
     node_count = len(nodes)
-    gap = 0.12
+
+    # 動態計算最佳 gap
+    total_min_width = sum(estimate_node_min_width(node) for node in nodes)
+    available_space = width - total_min_width
+
+    if available_space < 0:
+        gap = FLOW_LAYOUT_CONFIG["min_gap"]
+    else:
+        optimal_gap = available_space / (node_count - 1) if node_count > 1 else 0
+        gap = min(optimal_gap, FLOW_LAYOUT_CONFIG["default_gap"])
+
     node_width = (width - gap * (node_count - 1)) / node_count
 
     for i, node in enumerate(nodes):
@@ -595,6 +667,104 @@ def draw_flow(slide, left, top, width, height, nodes):
             arrow.fill.solid()
             arrow.fill.fore_color.rgb = RGBColor(150, 150, 150)
             arrow.line.fill.background()
+
+
+def draw_flow_vertical(slide, left, top, width, height, nodes):
+    """縱向流程圖（後備方案）"""
+    node_count = len(nodes)
+    node_gap = 0.06
+    node_height = (height - node_gap * (node_count - 1)) / node_count
+    node_width = width - 0.2
+
+    for i, node in enumerate(nodes):
+        node_top = top + i * (node_height + node_gap)
+        node_left = left + 0.1
+
+        # 解析節點內容
+        if isinstance(node, dict):
+            title = node.get("title", "")
+            desc = node.get("desc", "")
+            time_label = node.get("time", "")
+            color = node.get("color", COLOR_BLUE)
+            highlight = node.get("highlight", False)
+        else:
+            title = str(node)
+            desc = ""
+            time_label = ""
+            color = COLOR_BLUE
+            highlight = False
+
+        # 繪製節點
+        node_shape = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            Inches(node_left), Inches(node_top),
+            Inches(node_width), Inches(node_height)
+        )
+        node_shape.fill.solid()
+        node_shape.fill.fore_color.rgb = color
+        node_shape.line.fill.background()
+
+        # 高亮標記
+        if highlight:
+            highlight_box = slide.shapes.add_shape(
+                MSO_SHAPE.ROUNDED_RECTANGLE,
+                Inches(node_left - 0.03), Inches(node_top - 0.03),
+                Inches(node_width + 0.06), Inches(node_height + 0.06)
+            )
+            highlight_box.fill.background()
+            highlight_box.line.color.rgb = COLOR_RED
+            highlight_box.line.width = Pt(2)
+            highlight_box.line.dash_style = MSO_LINE_DASH_STYLE.DASH
+
+        # 文字內容
+        tf = node_shape.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.text = title
+        p.font.size = Pt(8)
+        p.font.bold = True
+        p.font.color.rgb = WHITE
+        p.font.name = FONT_NAME
+        p.alignment = PP_ALIGN.CENTER
+
+        if desc:
+            p2 = tf.add_paragraph()
+            p2.text = desc
+            p2.font.size = Pt(6)
+            p2.font.color.rgb = WHITE
+            p2.font.name = FONT_NAME
+            p2.alignment = PP_ALIGN.CENTER
+
+        if time_label:
+            p3 = tf.add_paragraph()
+            p3.text = time_label
+            p3.font.size = Pt(6)
+            p3.font.bold = True
+            p3.font.color.rgb = RGBColor(255, 255, 200)
+            p3.font.name = FONT_NAME
+            p3.alignment = PP_ALIGN.CENTER
+
+        # 下箭頭
+        if i < node_count - 1:
+            arrow = slide.shapes.add_shape(
+                MSO_SHAPE.DOWN_ARROW,
+                Inches(node_left + node_width/2 - 0.06), Inches(node_top + node_height),
+                Inches(0.12), Inches(node_gap)
+            )
+            arrow.fill.solid()
+            arrow.fill.fore_color.rgb = RGBColor(150, 150, 150)
+            arrow.line.fill.background()
+
+
+def draw_flow_adaptive(slide, left, top, width, height, nodes, arrow_labels=None):
+    """自適應流程圖：優先橫向，必要時自動切換縱向"""
+    should_vertical, reason = should_use_vertical_flow(nodes, width)
+
+    if should_vertical:
+        print(f"[自動切換縱向] {reason}")
+        return draw_flow_vertical(slide, left, top, width, height, nodes)
+    else:
+        return draw_flow(slide, left, top, width, height, nodes)
 
 
 def draw_architecture(slide, left, top, width, height, layers):

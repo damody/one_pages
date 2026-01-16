@@ -51,6 +51,14 @@ Task(
 ### glossary.md
 {貼上完整的 glossary.md 內容}
 
+### technical_appendix.md ⭐ 新增
+{貼上完整的 technical_appendix.md 內容，如無則標註「# 無技術附錄（DETAIL_LEVEL = TECHNICAL 或無技術細節需移到附錄）」}
+
+## 原始素材（用於素材完整性檢查）⭐ 新增
+
+### materials.md
+{貼上完整的 materials.md 內容，包含所有 Citation}
+
 ## 審稿檢查清單
 
 請逐一檢查以下項目，產出 Issue List：
@@ -65,6 +73,12 @@ Task(
 7. 邏輯鏈是否完整？
 8. 金字塔結構是否成立？
 9. 演講稿邏輯是否一步接一步？
+
+### ⭐ 新增：素材完整性檢查（關鍵）
+
+10. **技術細節完整性**：materials.md 中的技術實體（執行緒名稱、函數名稱、技術表格）是否有出現在 one_page.md 或 technical_appendix.md？
+11. **Citation 覆蓋率**：materials.md 的每個 Citation 是否都有被引用？
+12. **附錄與主報告一致性**：one_page.md 的簡化描述與 technical_appendix.md 的完整內容是否矛盾？
 
 ## 輸出格式
 
@@ -159,9 +173,99 @@ Task(
 - 有沒有「缺漏論點」？
 
 ### 9. 演講稿邏輯是否一步接一步？
-- 每一句話都承接上一句，聽眾能跟上思路
+- 每一句話都承接上一句,聽眾能跟上思路
 - 沒有「跳躍式敘述」
 - 結論是前面所有段落的邏輯總結
+
+### 10. 技術細節完整性（素材完整性檢查）
+
+**目的**：確保 materials.md 中的重要技術實體沒有在報告過程中遺失。
+
+**檢查方法**：
+
+**步驟 1：識別 materials.md 中的「技術實體」**
+- 執行緒名稱（如 InputReader, SurfaceFlinger, RenderThread）
+- 函數名稱（如 notifyMotion(), scheduleTraversals(), dequeueBuffer()）
+- 技術表格（如時序分析表、引擎差異對比表、效能測試表）
+- 系統架構中的模組名稱（如 BufferQueue, HWComposer）
+- 程式碼片段或 API 呼叫序列
+
+**步驟 2：檢查這些技術實體是否出現在以下任一位置**
+- ✓ one_page.md（主報告）
+- ✓ technical_appendix.md（技術附錄）
+- ✓ diagrams.md（圖表節點或標籤）
+
+**步驟 3：標記「完全遺失」的技術實體**
+- 如果某個技術實體在 materials.md 中佔有重要篇幅（例如完整的執行緒列表、詳細的函數呼叫鏈），但在上述三個位置都找不到，則標註為 Issue。
+
+**Issue 範例**：
+```markdown
+### Q10：Android 完整流程的執行緒名稱遺失
+
+- **類型**：missing_technical_detail
+- **問題**：materials.md [C6] 提到完整的執行緒列表（InputReader → InputDispatcher → ViewRootImpl → RenderThread），但在 one_page.md、technical_appendix.md、diagrams.md 中都沒有出現
+- **位置**：技術附錄
+- **影響**：技術同仁無法理解完整的系統流程，無法據此進行實作或除錯
+- **處理**：material
+- **建議**：在 technical_appendix.md 新增「Android Touch2Photon 完整流程」章節，列出執行緒列表和函數呼叫鏈，保留 Citation [C6]
+```
+
+**判斷原則**：
+- **需標註 Issue**：重要技術細節（如核心流程的執行緒、關鍵函數、技術總結表）完全遺失
+- **不需標註**：次要細節（如某個執行緒的優先級數值）或已在圖表中以視覺方式呈現
+
+### 11. Citation 覆蓋率
+
+**目的**：確保 materials.md 中的每個 Citation (C1, C2, C3...) 都有被使用，避免重要資訊遺漏。
+
+**檢查方法**：
+
+**步驟 1：列出所有 Citation ID**
+- 從 materials.md 中抽取所有 Citation ID（例如 [C1], [C2], ... [C12]）
+
+**步驟 2：檢查每個 Citation 是否被引用**
+- 在 one_page.md、technical_appendix.md、diagrams.md、script.md、glossary.md 中搜尋每個 Citation ID
+
+**步驟 3：標記未使用的 Citation**
+- 如果某個 Citation 在所有輸出檔案中都沒有出現，標註為 Issue
+
+**Issue 範例**：
+```markdown
+### Q11：Citation C11, C12 未使用
+
+- **類型**：unused_citation
+- **問題**：materials.md [C11][C12] 包含「Unity vs Unreal 引擎差異分析」的重要資訊，但在所有輸出檔案中都沒有引用
+- **位置**：技術附錄
+- **影響**：遺漏了不同引擎導致延遲差異的關鍵分析，可能誤導 POC 設計
+- **處理**：material
+- **建議**：在 technical_appendix.md 新增「引擎差異分析」章節，說明 Unity Double Buffering 與 Unreal Pipelined 的延遲特性差異
+```
+
+**判斷原則**：
+- **需標註 Issue**：Citation 包含核心證據、技術分析、或與結論相關的資訊
+- **不需標註**：Citation 為補充性質（如歷史背景、相關但非核心的資訊）且確實不影響報告完整性
+
+### 12. 附錄與主報告一致性
+
+**目的**：確保 one_page.md 的簡化描述與 technical_appendix.md 的完整內容不矛盾。
+
+**檢查項目**：
+
+1. **數字一致性**：主報告提到的數字（改善百分比、延遲時間）與附錄的詳細數據是否一致？
+2. **結論一致性**：主報告的結論是否與附錄的詳細分析支持？
+3. **適用範圍一致性**：主報告說「適用於所有場景」，但附錄說「僅在特定條件下有效」？
+
+**Issue 範例**：
+```markdown
+### Q12：主報告與附錄的改善數字不一致
+
+- **類型**：inconsistency
+- **問題**：one_page.md 說「Touch2Photon 降低 81%」，但 technical_appendix.md 的詳細表格顯示「Unity 降低 81%，Unreal 降低 45%」
+- **位置**：證據區塊
+- **影響**：主報告過度簡化導致誤導，讓人以為所有引擎都有 81% 改善
+- **處理**：rewrite
+- **建議**：主報告改為「Touch2Photon 降低 45-81%（視引擎而定）」，並註明「詳見技術附錄」
+```
 
 ---
 
@@ -178,6 +282,8 @@ Task(
 | `pyramid_violation` | 金字塔結構問題 | 調整結構 |
 | `script_logic_gap` | 演講稿邏輯問題 | 重寫演講稿 |
 | `not_plain_enough` | 說明不夠白話 | 提供具體改寫建議 |
+| `missing_technical_detail` | 技術細節遺失（執行緒、函數、表格） | material（從 materials.md 恢復到 technical_appendix.md）|
+| `unused_citation` | Citation 未使用（重要資訊遺漏） | material（補充到 technical_appendix.md 或 one_page.md）|
 
 ---
 
@@ -200,6 +306,15 @@ Task(
   - 原文：「{原本的寫法}」
   - 問題：{哪裡國中生看不懂}
   - 建議改為：「{具體的白話文改寫}」
+- **素材完整性分析**（如為 missing_technical_detail）：
+  - 遺失內容：{哪些技術實體（執行緒/函數/表格）遺失}
+  - 原始位置：materials.md [{Citation ID}]
+  - 影響：{技術同仁無法理解什麼}
+  - 恢復位置：{one_page.md | technical_appendix.md | diagrams.md}
+- **Citation 分析**（如為 unused_citation）：
+  - 未使用的 Citation：[{Citation ID list}]
+  - 內容摘要：{這些 Citation 包含什麼資訊}
+  - 重要性：{為何這些資訊不應遺漏}
 - **處理**：{material | web_research | experiment | user_input | rewrite}
 - **建議**：{修正方向}
 
