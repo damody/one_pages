@@ -3,14 +3,16 @@
 ## 4.0 入口檢查
 
 **IF `RESUME_FROM` > 4：**
-1. 從 `./output/phase4/` 讀取 checkpoint：
+1. 從 `./output/phase4/` 讀取 checkpoint（必須存在且非空）：
    - `issues.md` → Issue List
    - `verification.md` → 查證結果（如有）
    - `user_answers.md` → 使用者回答（如有）
-2. 跳過本 Phase，直接進入 Phase 5
+2. **強制驗證（缺檔直接中止）**：若任一檔案不存在或為空，代表 Phase 4 中繼檔未正確產生，必須停止並回報錯誤，要求重跑/修 prompt。
+3. 驗證通過後，跳過本 Phase，直接進入 Phase 5
 
 **ELSE：**
 - 正常執行下方流程
+
 
 ---
 
@@ -96,6 +98,37 @@ Task(
 - **建議**：{修正方向}
 
 如果沒有發現問題，請明確說明「審稿通過，無需修改」。
+
+---
+
+## ✅ Phase4 Checkpoint（必須在 subagent 內完成）
+
+你的輸出不只要回覆在對話中，還必須**實際寫出 checkpoint 檔案**，避免主 agent 漏寫導致 Phase4 中繼檔缺失。
+
+### 1) 建立目錄（跨平台）
+
+使用 Bash 工具執行（不要用 shell 的 `mkdir`/`cp`，Windows 容易失敗）：
+
+```bash
+python -c "from pathlib import Path; Path('output/phase4').mkdir(parents=True, exist_ok=True)"
+```
+
+### 2) 寫入檔案（使用 Write 工具）
+
+- `./output/phase4/issues.md`：寫入完整 Issue List（即使審稿通過也要寫，內容為 `審稿通過，無需修改`）
+- `./output/phase4/verification.md`：如無查證寫入 `# 無查證`
+- `./output/phase4/user_answers.md`：如無需詢問寫入 `# 無需詢問`
+
+### 3) 存在性驗證（必須）
+
+用 Bash 工具執行下列檢查，確保檔案真的存在且非空：
+
+```bash
+python -c "from pathlib import Path; files=['output/phase4/issues.md','output/phase4/verification.md','output/phase4/user_answers.md'];
+missing=[f for f in files if not Path(f).exists() or Path(f).stat().st_size==0];
+print('missing_or_empty',missing); raise SystemExit(1 if missing else 0)"
+```
+
 """
 )
 ```
@@ -412,9 +445,14 @@ Task(
 
 Phase 4 完成後，將所有輸出儲存到 checkpoint：
 
-1. 建立目錄：`mkdir -p ./output/phase4`
+1. 建立目錄（跨平台）：
 
-2. 使用 Write 工具寫入以下檔案：
+   ```bash
+   python -c "from pathlib import Path; Path('output/phase4').mkdir(parents=True, exist_ok=True)"
+   ```
+
+2. 使用 Write 工具寫入以下檔案（即使內容為「無」也要寫出檔案）：
+
 
 **./output/phase4/issues.md**
 ```markdown
@@ -437,11 +475,26 @@ Phase 4 完成後，將所有輸出儲存到 checkpoint：
 {Phase 4.7 的使用者回答，如無則寫入「# 無需詢問」}
 ```
 
+---
+
+## 4.8.1 Checkpoint 驗證（強制；失敗即中止）
+
+完成 Write 後，必須用 Bash 工具驗證檔案存在且非空：
+
+```bash
+python -c "from pathlib import Path; files=['output/phase4/issues.md','output/phase4/verification.md','output/phase4/user_answers.md']; missing=[f for f in files if not Path(f).exists() or Path(f).stat().st_size==0]; print('missing_or_empty',missing); raise SystemExit(1 if missing else 0)"
+```
+
+若驗證失敗，代表 checkpoint 未落盤或寫入失敗，必須停止流程並修正。
+
+
 ### 多輪迭代時的版本保留
 
 當迭代輪次 > 1 時，同時複製到 iterations 目錄：
 
 ```bash
-mkdir -p ./output/iterations/iter{N}/phase4
-cp ./output/phase4/* ./output/iterations/iter{N}/phase4/
+python -c "from pathlib import Path; import shutil; n='{N}'; dst=Path(f'output/iterations/iter{n}/phase4'); dst.mkdir(parents=True, exist_ok=True);
+for name in ['issues.md','verification.md','user_answers.md']:
+    shutil.copy2(Path('output/phase4')/name, dst/name)"
 ```
+

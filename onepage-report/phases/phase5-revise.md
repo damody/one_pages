@@ -327,9 +327,14 @@ Task tool 參數：
 
 Phase 5 完成後，將所有輸出儲存到 checkpoint：
 
-1. 建立目錄：`mkdir -p ./output/phase5`
+1. 建立目錄（跨平台，必須成功）：
 
-2. 使用 Write 工具寫入以下檔案：
+   ```bash
+   python -c "from pathlib import Path; Path('output/phase5').mkdir(parents=True, exist_ok=True)"
+   ```
+
+2. 使用 Write 工具寫入以下檔案（即使內容為空也要寫出檔案）：
+
 
 **./output/phase5/one_page.md**
 ```
@@ -366,11 +371,26 @@ Phase 5 完成後，將所有輸出儲存到 checkpoint：
 {完整技術附錄，如 DETAIL_LEVEL = TECHNICAL 則寫入「# 無技術附錄（所有細節在主報告中）」}
 ```
 
+---
+
+## 5.9.1 Checkpoint 驗證（強制；失敗即中止）
+
+完成 Write 後，必須用 Bash 工具驗證檔案存在且非空：
+
+```bash
+python -c "from pathlib import Path; files=['output/phase5/one_page.md','output/phase5/diagrams.md','output/phase5/table.md','output/phase5/glossary.md','output/phase5/script.md','output/phase5/citation_map.md','output/phase5/technical_appendix.md']; missing=[f for f in files if not Path(f).exists() or Path(f).stat().st_size==0]; print('missing_or_empty',missing); raise SystemExit(1 if missing else 0)"
+```
+
+若驗證失敗，代表 checkpoint 未落盤或寫入失敗，必須停止流程並修正。
+
+
 ### 多輪迭代時的版本保留
 
 當迭代輪次 > 1 時，同時複製到 iterations 目錄：
 
 ```bash
-mkdir -p ./output/iterations/iter{N}/phase5
-cp ./output/phase5/* ./output/iterations/iter{N}/phase5/
+python -c "from pathlib import Path; import shutil; n='{N}'; dst=Path(f'output/iterations/iter{n}/phase5'); dst.mkdir(parents=True, exist_ok=True);
+for name in ['one_page.md','diagrams.md','table.md','glossary.md','script.md','citation_map.md','technical_appendix.md']:
+    shutil.copy2(Path('output/phase5')/name, dst/name)"
 ```
+

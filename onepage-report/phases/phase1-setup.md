@@ -163,9 +163,14 @@
 
 設定完成後，將全域變數儲存到 checkpoint：
 
-1. 建立目錄：`mkdir -p ./output/phase1`
+1. 建立目錄（跨平台，必須成功）：
 
-2. 使用 Write 工具寫入 `./output/phase1/config.md`：
+   ```bash
+   python -c "from pathlib import Path; Path('output/phase1').mkdir(parents=True, exist_ok=True)"
+   ```
+
+2. 使用 Write 工具寫入 `./output/phase1/config.md`（即使值為空也要寫出檔案）：
+
 
 ```markdown
 # Phase 1 設定
@@ -183,7 +188,20 @@ INPUT_PATH: {input_path 的值}
 
 ---
 
+## 1.3.1 Checkpoint 驗證（強制；失敗即中止）
+
+完成 Write 後，必須用 Bash 工具驗證檔案存在且非空：
+
+```bash
+python -c "from pathlib import Path; p=Path('output/phase1/config.md'); ok=p.exists() and p.stat().st_size>0; print('phase1_config_ok',ok); raise SystemExit(0 if ok else 1)"
+```
+
+若驗證失敗，代表 checkpoint 未落盤或寫入失敗，必須停止流程並修正。
+
+---
+
 ## 1.4 Checkpoint 讀取格式
+
 
 當 `RESUME_FROM > 1` 時，從 `./output/phase1/config.md` 讀取並解析：
 

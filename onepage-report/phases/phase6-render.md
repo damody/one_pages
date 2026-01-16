@@ -22,7 +22,7 @@
 ## 6.1 建立輸出目錄
 
 ```bash
-mkdir -p ./output
+python -c "from pathlib import Path; Path('output').mkdir(parents=True, exist_ok=True)"
 ```
 
 ---
@@ -36,7 +36,13 @@ mkdir -p ./output
 | `svg_png` | 使用 Task subagent 生成 SVG → cairosvg 轉 PNG → 嵌入 PPTX | `Read {skill_dir}/reference/svg-generation.md` |
 | `pptx_shapes` | 在 render_this.py 中直接使用 python-pptx shapes API 繪製 | `Read {skill_dir}/reference/pptx-shapes.md` |
 
-1. 將 diagrams.md 內容儲存到 `./output/diagrams.md`
+1. 將 diagrams.md 內容**使用 Write 工具**儲存到 `./output/diagrams.md`（即使內容為空也要寫出檔案）
+
+2. （建議）在寫入後立刻做存在性驗證：
+
+```bash
+python -c "from pathlib import Path; p=Path('output/diagrams.md'); ok=p.exists() and p.stat().st_size>0; print('output_diagrams_ok',ok); raise SystemExit(0 if ok else 1)"
+```
 
 ---
 
@@ -175,12 +181,36 @@ Task(
 
 ## ⚠️ 內容完整性要求（絕對禁止刪減）
 
-- **one_page.md 的每一段文字都必須出現在投影片中**
-- **glossary.md 的每一個術語解釋都必須放入附錄**
-- **technical_appendix.md 的每個章節都必須產生對應投影片**（如 DETAIL_LEVEL != TECHNICAL）
-- 不能因為版面不夠就省略內容
-- 如果內容太多，應該調小字體（最小 8pt）或分多頁，而不是刪減
-- 表格的每一行每一列都必須完整呈現
+### A) 主報告 one_page.md（最常漏）
+
+- **必須把 `one_page.md` 完整內容渲染到投影片**
+  - **優先**：盡量將所有內容排進第 1 頁（可縮小字體至 8pt、調整佈局、增加欄數）
+  - **若內容過多需分頁**：續頁也必須使用 `add_content_box()` 等結構化元件呈現，**禁止純文字逐行顯示（文字牆）**
+    - 續頁標題規則：延用 `one_page.md` 的 `#` 主標題加頁碼（例：`{主標題}（2/3）`）
+    - 禁止使用與內容無關的通用標題（例如 `Main Report (cont.)`、`verbatim`、`主報告完整內容` 等）
+- **`#` 主標題必須來自 `one_page.md` 第 1 行**（禁止硬編成固定句子，例如「導入 Anti-Lag SDK 可望...」）
+- `[[Term]]`、`[C1]` 這類標記不得因清理文字而被刪掉；如無法做超連結，也至少要以純文字保留
+
+### B) 其他文件（同樣必須全收）
+
+- **glossary.md 的每一個術語解釋都必須放入附錄**（允許多頁）
+- **technical_appendix.md 的每個章節都必須產生對應投影片**（如 DETAIL_LEVEL != TECHNICAL；允許 verbatim 分頁）
+- table.md：表格每一行每一列都必須完整呈現；若表格太大，可拆分多頁或在附錄加上 `table.md (verbatim)`
+- 不能因為版面不夠就省略內容；內容太多就縮小字（最小 8pt）或分多頁
+
+### C) 強制驗證（避免「看起來有畫，但文字漏了」）
+
+- 產生完 PPTX 後，必須做文字存在性驗證：
+  - 在 PPTX 的所有 shape text 中搜尋 `one_page.md` 第 1 行的關鍵片段（例如前 10~20 個字），必須命中
+  - 也要搜尋 `##` 的至少 2 個小節標題，確保主文確實被帶入（例如：`已驗證的成功要素`）
+- 若驗證失敗：回到修正 `render_this.py` 的分頁/渲染邏輯，重新產生 PPTX，直到驗證通過
+
+### D) Windows 常見錯誤：final.pptx 被鎖住
+
+- 若 `prs.save('./output/final.pptx')` 出現 `PermissionError: [Errno 13] Permission denied`：
+  - 代表 PowerPoint 正在開啟 `final.pptx` 或系統鎖定檔案
+  - 解法 1（推薦）：先存成 `final_tmp.pptx`（或加時間戳），存檔成功後再另存/覆蓋
+  - 解法 2：提示使用者先關閉 PowerPoint 再重跑
 
 ## 佈局決策原則
 
@@ -349,11 +379,14 @@ if os.path.exists(technical_appendix_path):
 
 ## 步驟 2：執行 render_this.py
 
-使用 Bash 工具執行：
+使用 Bash 工具執行（避免用 `cd`，請用 workdir 或在命令內用相對路徑）：
 
 ```bash
-cd ./output && python render_this.py
+python render_this.py
 ```
+
+（執行時 workdir 應設為 `./output`）
+
 
 **預期輸出**：
 - `./output/final.pptx` 檔案產生
@@ -412,7 +445,7 @@ IF 發現問題：
 
 ## 輸出檔案
 
-完成後，應該產生以下檔案：
+完成後，應該產生以下檔案（全部都必須存在且非空）：
 
 | 檔案 | 說明 |
 |------|------|
@@ -426,10 +459,24 @@ IF 發現問題：
 
 當以下條件全部滿足時，回報「✅ Phase 6 完成」：
 
-1. ✅ final.pptx 檔案存在
-2. ✅ 圖表完整性驗證通過（diagrams.md + technical_appendix.md）
-3. ✅ script.txt 檔案存在
-4. ✅ 無 Python 執行錯誤
+1. ✅ `./output/render_this.py` 存在且非空（必須用 Write 工具產生）
+2. ✅ `./output/final.pptx` 存在且非空（若遇到 PermissionError，直接中止並提示使用者關閉 PowerPoint）
+3. ✅ `./output/diagrams.md` 存在且非空（必須用 Write 工具寫出）
+4. ✅ 圖表完整性驗證通過（diagrams.md + technical_appendix.md）
+5. ✅ `./output/script.txt` 存在且非空（必須用 Write 工具寫出）
+6. ✅ 無 Python 執行錯誤
+
+---
+
+## 6.4 Checkpoint 驗證（強制；失敗即中止）
+
+完成所有 Write 與執行後，必須用 Bash 工具驗證輸出檔案存在且非空：
+
+```bash
+python -c "from pathlib import Path; files=['output/diagrams.md','output/render_this.py','output/final.pptx','output/script.txt']; missing=[f for f in files if not Path(f).exists() or Path(f).stat().st_size==0]; print('missing_or_empty',missing); raise SystemExit(1 if missing else 0)"
+```
+
+若驗證失敗，代表輸出未落盤或被鎖住，必須停止流程並修正。
 
 請開始執行。
 """

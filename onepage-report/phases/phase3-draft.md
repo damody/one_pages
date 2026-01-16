@@ -401,9 +401,14 @@ InputReader::loopOnce()
 
 Phase 3 完成後，將所有輸出儲存到 checkpoint：
 
-1. 建立目錄：`mkdir -p ./output/phase3`
+1. 建立目錄（跨平台，必須成功）：
 
-2. 使用 Write 工具寫入以下檔案：
+   ```bash
+   python -c "from pathlib import Path; Path('output/phase3').mkdir(parents=True, exist_ok=True)"
+   ```
+
+2. 使用 Write 工具寫入以下檔案（即使內容為空也要寫出檔案）：
+
 
 **./output/phase3/one_page.md**
 ```
@@ -434,3 +439,16 @@ Phase 3 完成後，將所有輸出儲存到 checkpoint：
 ```
 {3.6 節產生的演講稿}
 ```
+
+---
+
+## 3.8.1 Checkpoint 驗證（強制；失敗即中止）
+
+完成 Write 後，必須用 Bash 工具驗證檔案存在且非空：
+
+```bash
+python -c "from pathlib import Path; files=['output/phase3/one_page.md','output/phase3/diagrams.md','output/phase3/table.md','output/phase3/technical_appendix.md','output/phase3/glossary.md','output/phase3/script.md']; missing=[f for f in files if not Path(f).exists() or Path(f).stat().st_size==0]; print('missing_or_empty',missing); raise SystemExit(1 if missing else 0)"
+```
+
+若驗證失敗，代表 checkpoint 未落盤或寫入失敗，必須停止流程並修正。
+
