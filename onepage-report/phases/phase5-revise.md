@@ -1,5 +1,11 @@
 # Phase 5：根據回饋重寫
 
+> **執行者：subagent**
+> **輸入：** `./output/phase3/`（原稿）+ `./output/phase4/`（審稿結果）
+> **輸出：** `./output/phase5/`
+
+---
+
 ## 5.0 入口檢查
 
 **IF `RESUME_FROM` > 5：**

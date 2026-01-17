@@ -1,4 +1,11 @@
-# Phase 4：主管審稿（必須使用 Sub Agent）
+# Phase 4：主管審稿
+
+> **執行者：subagent**
+> **輸入：** `./output/phase3/`（初稿）
+> **輸出：** `./output/phase4/`
+> **注意：** 如需詢問用戶補充資料，可直接使用 AskUserQuestion
+
+---
 
 ## 4.0 入口檢查
 

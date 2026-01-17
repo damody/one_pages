@@ -6,29 +6,29 @@ arguments: [input_path]
 
 # 一頁投影片產生器
 
-> 版本：v2.8（支援從中間繼續）
+> 版本：v3.0（Subagent 架構）
 
 將素材（資料夾/PPTX/URL）轉換成專業的一頁投影片與演講稿。
 
-**新功能：支援從中間 Phase 繼續執行**
-- 每個 Phase 完成後會自動儲存 checkpoint 到 `./output/phase{N}/`
-- 出錯或中斷後可以從任意 Phase 繼續，不需從頭開始
-- 使用者可以手動修改 checkpoint 檔案，然後繼續執行
+## 架構說明
+
+**主 agent 只負責調控**，Phase 2-6 全部由 subagent 執行：
+- 每個 Phase 的 subagent 讀取上一個 Phase 的 checkpoint 資料
+- 每個 Phase 完成後輸出到 `./output/phase{N}/`
+- 支援從任意 Phase 繼續執行
 
 ---
 
 ## 執行流程概述
 
-本技能按以下順序執行，每個階段的詳細規範請讀取對應檔案：
-
-| Phase | 說明 | 規範檔案 |
-|-------|------|----------|
-| 1 | 設定詢問 | `{skill_dir}/phases/phase1-setup.md` |
-| 2 | 讀取素材 | `{skill_dir}/phases/phase2-input.md` |
-| 3 | 產生初稿 | `{skill_dir}/phases/phase3-draft.md` |
-| 4 | 主管審稿 | `{skill_dir}/phases/phase4-review.md` |
-| 5 | 重寫迭代 | `{skill_dir}/phases/phase5-revise.md` |
-| 6 | 渲染輸出 | `{skill_dir}/phases/phase6-render.md` |
+| Phase | 說明 | 執行者 | 輸入 | 規範檔案 |
+|-------|------|--------|------|----------|
+| 1 | 設定詢問 | **主 agent** | 用戶輸入 | `{skill_dir}/phases/phase1-setup.md` |
+| 2 | 讀取素材 | subagent | phase1 checkpoint | `{skill_dir}/phases/phase2-input.md` |
+| 3 | 產生初稿 | subagent | phase2 checkpoint | `{skill_dir}/phases/phase3-draft.md` |
+| 4 | 主管審稿 | subagent | phase3 checkpoint | `{skill_dir}/phases/phase4-review.md` |
+| 5 | 重寫迭代 | subagent | phase4 checkpoint | `{skill_dir}/phases/phase5-revise.md` |
+| 6 | 渲染輸出 | subagent | phase5 checkpoint | `{skill_dir}/phases/phase6-render.md` |
 
 ---
 
@@ -48,99 +48,125 @@ arguments: [input_path]
 
 ---
 
-## Phase 1：設定詢問
+## Phase 1：設定詢問（主 agent 執行）
 
 **執行前請讀取：** `Read {skill_dir}/phases/phase1-setup.md`
 
-使用 AskUserQuestion 工具詢問使用者設定，記錄到全域變數。
+主 agent 直接執行，使用 AskUserQuestion 工具詢問使用者設定。
 
 ---
 
-## Phase 2：讀取素材
+## Phase 2-6：Subagent 執行
 
-**執行前請讀取：** `Read {skill_dir}/phases/phase2-input.md`
+**每個 Phase 都使用 Task tool 呼叫 subagent**，prompt 格式如下：
 
-根據 `{input_path}` 判斷輸入類型並處理：
-- 資料夾：掃描 .txt/.md/.pptx/.pdf 檔案
-- PPTX 檔案：使用 extract_pptx.py 抽取
-- PDF 檔案：使用 extract_pdf.py 抽取
-- URL：使用 WebFetch 抓取
+```
+請執行 Phase {N}：{Phase 說明}
 
-完成後建立 Citation Map 和術語清單。
+**規範檔案：** 請讀取 {skill_dir}/phases/phase{N}-xxx.md
 
----
+**輸入資料：** 請讀取 ./output/phase{N-1}/ 目錄下的所有檔案
 
-## Phase 3：產生初稿
+**輸出位置：** ./output/phase{N}/
 
-**執行前請讀取：**
-**必須使用 Task tool 調用 Sub Agent 產生初稿**
-
-1. `Read {skill_dir}/phases/phase3-draft.md` - 初稿生成流程
-2. `Read {skill_dir}/templates/one-page-format.md` - 報告格式
-3. `Read {skill_dir}/templates/diagrams-spec.md` - 圖表規範
-4. `Read {skill_dir}/templates/glossary-format.md` - 術語格式
-5. `Read {skill_dir}/templates/script-format.md` - 演講稿格式
-
-產生以下文件：
-- `one_page.md`：主報告內容
-- `diagrams.md`：圖表規格
-- `table.md`：數據比較表（如有）
-- `glossary.md`：術語詞彙表
-- `script.md`：演講稿
+請嚴格按照規範執行，完成後將結果寫入輸出目錄。
+```
 
 ---
 
-## Phase 4：主管審稿
+## Phase 2：讀取素材（subagent）
 
-**執行前請讀取：** `Read {skill_dir}/phases/phase4-review.md`
-**必須使用 Task tool 調用 Sub Agent 執行審查**，產出 Issue List。
+**Task tool prompt：**
+```
+請執行 Phase 2：讀取素材
 
-如有 Issue 需要網路查證，進入 Phase 4.5。
-如有 Issue 需要實驗佐證，讀取 `{skill_dir}/templates/experiment-plan.md` 產出實驗計畫。
-如有 Issue 需要使用者補充，進入 Phase 4.7 詢問使用者。
+規範檔案：Read {skill_dir}/phases/phase2-input.md
+輸入資料：Read ./output/phase1/config.md
+素材路徑：{input_path}
+
+輸出位置：./output/phase2/
+```
 
 ---
 
-## Phase 5：根據回饋重寫
+## Phase 3：產生初稿（subagent）
 
-**執行前請讀取：** `Read {skill_dir}/phases/phase5-revise.md`
+**Task tool prompt：**
+```
+請執行 Phase 3：產生初稿
 
-根據使用者對 Issue List 的回答修正初稿。
+規範檔案：
+- Read {skill_dir}/phases/phase3-draft.md
+- Read {skill_dir}/templates/one-page-format.md
+- Read {skill_dir}/templates/diagrams-spec.md
+- Read {skill_dir}/templates/glossary-format.md
+- Read {skill_dir}/templates/script-format.md
 
-**重要：每輪都必須輸出完整的 Markdown 文件**
+輸入資料：Read ./output/phase2/ 目錄下所有檔案
+
+輸出位置：./output/phase3/
+```
+
+---
+
+## Phase 4：主管審稿（subagent）
+
+**Task tool prompt：**
+```
+請執行 Phase 4：主管審稿
+
+規範檔案：Read {skill_dir}/phases/phase4-review.md
+輸入資料：Read ./output/phase3/ 目錄下所有檔案
+
+如需詢問用戶補充資料，請直接使用 AskUserQuestion 工具。
+
+輸出位置：./output/phase4/
+```
+
+---
+
+## Phase 5：重寫迭代（subagent）
+
+**Task tool prompt：**
+```
+請執行 Phase 5：根據審稿回饋重寫
+
+規範檔案：Read {skill_dir}/phases/phase5-revise.md
+輸入資料：
+- Read ./output/phase3/ 目錄下所有檔案（原稿）
+- Read ./output/phase4/ 目錄下所有檔案（審稿結果）
+
+輸出位置：./output/phase5/
+```
 
 ### 多輪迭代
 
-當 `MAX_ITERATIONS > 1` 時，重複 Phase 4 → Phase 5：
+當 `MAX_ITERATIONS > 1` 時，主 agent 控制迭代：
 
 ```
 WHILE 迭代計數 <= MAX_ITERATIONS:
-    【必須用 Task tool 呼叫 sub agent】執行 Phase 4
+    呼叫 Phase 4 subagent
     IF 審稿通過: BREAK
-    IF 達到上限: 強制保守輸出, BREAK
-    執行 Phase 5
+    IF 達到上限: BREAK
+    呼叫 Phase 5 subagent
 ```
 
 ---
 
-## Phase 6：渲染輸出
+## Phase 6：渲染輸出（subagent）
 
-**執行前請讀取：** `Read {skill_dir}/phases/phase6-render.md`
+**Task tool prompt：**
+```
+請執行 Phase 6：渲染輸出
 
-根據 `DIAGRAM_METHOD` 決定圖表產生方式：
+規範檔案：
+- Read {skill_dir}/phases/phase6-render.md
+- Read {skill_dir}/reference/pptx-shapes.md（或 svg-generation.md）
 
-| DIAGRAM_METHOD | 額外讀取 |
-|----------------|----------|
-| `svg_png` | `Read {skill_dir}/reference/svg-generation.md` |
-| `pptx_shapes` | `Read {skill_dir}/reference/pptx-shapes.md` |
+輸入資料：Read ./output/phase5/ 目錄下所有檔案
 
-**步驟：**
-1. 建立輸出目錄 `./output`
-2. 產生圖表（SVG/PNG 或 PPTX Shapes）
-3. **使用 Sub Agent 驗證內容完整性**
-4. 產生 PPTX（含附錄投影片）
-5. 執行排版審查（如 `LAYOUT_REVIEW_ROUNDS > 0`）
-6. 輸出演講稿和其他檔案
+輸出位置：./output/
+```
 
 ---
 

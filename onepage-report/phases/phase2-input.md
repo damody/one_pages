@@ -1,5 +1,11 @@
 # Phase 2：讀取素材
 
+> **執行者：subagent**
+> **輸入：** `./output/phase1/config.md` + `{input_path}` 素材路徑
+> **輸出：** `./output/phase2/`
+
+---
+
 ## 2.0 入口檢查
 
 **IF `RESUME_FROM` > 2：**

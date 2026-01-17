@@ -1,5 +1,11 @@
 # Phase 3：產生初稿
 
+> **執行者：subagent**
+> **輸入：** `./output/phase2/`（素材、citation map、術語清單）
+> **輸出：** `./output/phase3/`
+
+---
+
 ## 3.0 入口檢查
 
 **IF `RESUME_FROM` > 3：**

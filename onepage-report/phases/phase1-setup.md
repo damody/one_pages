@@ -66,7 +66,7 @@
     {
       "question": "審稿次數",
       "header": "進階",
-      "multiSelect": true,
+      "multiSelect": false,
       "options": [
         {"label": "5", "description": "審稿 5 輪"},
         {"label": "3", "description": "審稿 3 輪"},
@@ -76,7 +76,7 @@
     {
       "question": "排版審查次數",
       "header": "進階",
-      "multiSelect": true,
+      "multiSelect": false,
       "options": [
         {"label": "2", "description": "排版審查次數 5 輪"},
         {"label": "1", "description": "排版審查次數 3 輪"},
@@ -119,20 +119,13 @@
       "header": "技術細節",
       "multiSelect": false,
       "options": [
-        {"label": "預設 (平衡版)", "description": "主報告簡潔易懂，技術細節移到附錄"},
+        {"label": "完整版", "description": "主報告詳細清楚，至少一張圖跟超多字，放不下的技術細節才用術語濃縮移到附錄"},
         {"label": "自定", "description": "手動指定技術細節處理方式"}
       ]
     }
   ]
 }
 ```
-
-### 技術細節程度說明
-
-| 選項 | DETAIL_LEVEL 值 | 說明 |
-|------|----------------|------|
-| 完整版 | FULL_DETAIL | 主報告詳細清楚，至少一張圖跟超多字，放不下的技術細節才用術語濃縮移到附錄 |
-| 自定 | 使用者指定 | 使用者手動輸入需求 |
 
 ---
 
