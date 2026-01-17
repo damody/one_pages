@@ -38,9 +38,12 @@ arguments: [input_path]
 |------|------|--------|
 | `PURPOSE` | 報告目的 | - |
 | `EVIDENCE` | 佐證強度 | E0 |
+| `DETAIL_LEVEL` | 技術細節保留程度 | BALANCED |
 | `MAX_ITERATIONS` | 審稿輪數 | 5 |
 | `DIAGRAM_METHOD` | 繪圖方式 | pptx_shapes |
 | `LAYOUT_REVIEW_ROUNDS` | 排版審查輪數 | 2 |
+| `REVIEW_WEB_SEARCH` | 審稿時是否啟用網路查證 | false |
+| `CITATION_WEB_SEARCH` | Citation Map 是否啟用網路補充 | false |
 | `RESUME_FROM` | 從哪個 Phase 繼續（1-6） | 1 |
 
 ---
@@ -70,6 +73,8 @@ arguments: [input_path]
 ## Phase 3：產生初稿
 
 **執行前請讀取：**
+**必須使用 Task tool 調用 Sub Agent 產生初稿**
+
 1. `Read {skill_dir}/phases/phase3-draft.md` - 初稿生成流程
 2. `Read {skill_dir}/templates/one-page-format.md` - 報告格式
 3. `Read {skill_dir}/templates/diagrams-spec.md` - 圖表規範
@@ -88,7 +93,6 @@ arguments: [input_path]
 ## Phase 4：主管審稿
 
 **執行前請讀取：** `Read {skill_dir}/phases/phase4-review.md`
-
 **必須使用 Task tool 調用 Sub Agent 執行審查**，產出 Issue List。
 
 如有 Issue 需要網路查證，進入 Phase 4.5。

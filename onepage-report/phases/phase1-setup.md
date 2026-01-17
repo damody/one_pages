@@ -45,17 +45,6 @@
 {
   "questions": [
     {
-      "question": "這份報告想要達成什麼？",
-      "header": "目的",
-      "multiSelect": false,
-      "options": [
-        {"label": "核准 POC", "description": "請主管核准進行概念驗證"},
-        {"label": "申請資源", "description": "申請人力、預算或設備"},
-        {"label": "採用方案", "description": "建議採用特定技術方案"},
-        {"label": "知會進度", "description": "報告專案進度或成果"}
-      ]
-    },
-    {
       "question": "這份報告需要什麼程度的佐證？",
       "header": "佐證",
       "multiSelect": false,
@@ -75,14 +64,23 @@
       ]
     },
     {
-      "question": "需要調整進階設定嗎？",
+      "question": "審稿次數",
       "header": "進階",
       "multiSelect": true,
       "options": [
-        {"label": "使用預設值 (推薦)", "description": "審稿 5 輪、PPTX Shapes 繪圖、排版審查 2 輪"},
-        {"label": "改用 SVG/PNG 繪圖", "description": "圖表更精細但無法在 PPT 中編輯"},
-        {"label": "減少審稿輪數 (3 輪)", "description": "加快產出速度"},
-        {"label": "啟用 Citation 網路補充", "description": "在 Citation Map 中用 WebSearch 補充背景說明"}
+        {"label": "5", "description": "審稿 5 輪"},
+        {"label": "3", "description": "審稿 3 輪"},
+        {"label": "1", "description": "加快產出速度"},
+      ]
+    },
+    {
+      "question": "排版審查次數",
+      "header": "進階",
+      "multiSelect": true,
+      "options": [
+        {"label": "2", "description": "排版審查次數 5 輪"},
+        {"label": "1", "description": "排版審查次數 3 輪"},
+        {"label": "0", "description": "加快產出速度"},
       ]
     }
   ]
@@ -99,13 +97,30 @@
 {
   "questions": [
     {
+      "question": "啟用 Citation 網路補充",
+      "header": "技術細節",
+      "multiSelect": false,
+      "options": [
+        {"label": "是", "description": "啟用 Citation 網路補充"},
+        {"label": "否", "description": "關閉 Citation 網路補充"}
+      ]
+    },
+    {
+      "question": "繪圖方法",
+      "header": "技術細節",
+      "multiSelect": false,
+      "options": [
+        {"label": "pptx", "description": "PPTX Shapes 繪圖"},
+        {"label": "svg", "description": "圖表更精細但無法在 PPT 中編輯"}
+      ]
+    },
+    {
       "question": "您希望報告保留多少技術細節？",
       "header": "技術細節",
       "multiSelect": false,
       "options": [
-        {"label": "平衡版 (推薦)", "description": "主報告簡潔易懂，技術細節（執行緒、函數、表格）移到附錄投影片"},
-        {"label": "執行版", "description": "主報告極度精簡（國小生能懂），所有技術細節都在附錄"},
-        {"label": "技術版", "description": "主報告包含完整技術細節，不產生附錄（適合技術同仁）"}
+        {"label": "預設 (平衡版)", "description": "主報告簡潔易懂，技術細節移到附錄"},
+        {"label": "自定", "description": "手動指定技術細節處理方式"}
       ]
     }
   ]
@@ -114,32 +129,12 @@
 
 ### 技術細節程度說明
 
-| 選項 | DETAIL_LEVEL 值 | 主報告 | 技術附錄 | 適用對象 |
-|------|----------------|--------|---------|---------|
-| 平衡版（推薦）| BALANCED | 簡化易懂，結論+推論 | 完整技術細節（執行緒/函數/表格）| 主管 + 技術同仁 |
-| 執行版 | EXECUTIVE | 極度精簡，每區塊 2-3 點 | 完整技術細節 | VP/Director 級別 |
-| 技術版 | TECHNICAL | 完整技術細節 | 不產生 | 技術同仁 |
-
-**範例差異**：
-
-| 內容 | EXECUTIVE | BALANCED | TECHNICAL |
-|------|-----------|----------|-----------|
-| 主報告描述 | 「Touch2Photon 降低 81%」| 「Touch2Photon 降低 81%，因減少處理器搬移次數」| 「Touch2Photon 降低 81%，執行緒 InputReader → InputDispatcher → ViewRootImpl → RenderThread...」|
-| 技術附錄 | 完整執行緒列表 + 函數呼叫鏈 + 技術表格 | 完整執行緒列表 + 函數呼叫鏈 + 技術表格 | 無（所有細節在主報告）|
-| 投影片數量 | 1 (主報告) + 2-3 (技術附錄) + N (附錄圖) + 1 (術語) | 1 (主報告) + 2-3 (技術附錄) + N (附錄圖) + 1 (術語) | 1 (主報告) + N (附錄圖) + 1 (術語) |
+| 選項 | DETAIL_LEVEL 值 | 說明 |
+|------|----------------|------|
+| 完整版 | FULL_DETAIL | 主報告詳細清楚，至少一張圖跟超多字，放不下的技術細節才用術語濃縮移到附錄 |
+| 自定 | 使用者指定 | 使用者手動輸入需求 |
 
 ---
-
-### 進階設定解析
-
-根據使用者在「進階」問題的選擇：
-
-| 選項 | 對應變數設定 |
-|------|-------------|
-| 使用預設值 | 全部用預設 |
-| 改用 SVG/PNG 繪圖 | `DIAGRAM_METHOD = svg_png` |
-| 減少審稿輪數 | `MAX_ITERATIONS = 3` |
-| 啟用 Citation 網路補充 | `CITATION_WEB_SEARCH = true` |
 
 ## 全域變數
 
