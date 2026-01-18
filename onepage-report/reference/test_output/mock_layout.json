@@ -1,0 +1,55 @@
+{
+  "slide": {
+    "w_pt": 960,
+    "h_pt": 540,
+    "bg_color": "#FFFFFF"
+  },
+  "elements": [
+    {
+      "id": "title",
+      "kind": "text",
+      "role": "title",
+      "bounding_box": {
+        "x": 40,
+        "y": 30,
+        "w": 880,
+        "h": 40
+      },
+      "content": "Anti-Lag POC"
+    },
+    {
+      "id": "subtitle",
+      "kind": "text",
+      "role": "subtitle",
+      "bounding_box": {
+        "x": 40,
+        "y": 75,
+        "w": 880,
+        "h": 25
+      },
+      "content": "目標：降低輸入延遲，並保留穩定幀率"
+    },
+    {
+      "id": "kpi_table",
+      "kind": "table",
+      "role": "body",
+      "bounding_box": {
+        "x": 40,
+        "y": 120,
+        "w": 300,
+        "h": 100
+      }
+    },
+    {
+      "id": "flow",
+      "kind": "figure",
+      "role": "body",
+      "bounding_box": {
+        "x": 360,
+        "y": 120,
+        "w": 560,
+        "h": 200
+      }
+    }
+  ]
+}
