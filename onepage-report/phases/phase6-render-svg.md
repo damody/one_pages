@@ -1,6 +1,6 @@
 # Phase 6 附錄：SVG/PNG 渲染方式
 
-> **使用條件：** 當 `DIAGRAM_METHOD = svg_png` 時載入此檔案
+> **使用條件：** 當 `LAYOUT_ENGINE = svg_png` 時載入此檔案
 > **執行前請讀取：** `{skill_dir}/reference/svg-generation.md`
 
 ---

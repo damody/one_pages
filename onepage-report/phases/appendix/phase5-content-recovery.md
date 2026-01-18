@@ -1,6 +1,8 @@
 # Phase 5 附錄：內容恢復流程
 
 > **載入條件：** 當 Phase 4 發現 `missing_technical_detail` 或 `unused_citation` Issue 時載入此檔案
+>
+> **v4.1 簡化：** 所有內容都恢復到 one_page.md（固定為 TECHNICAL 模式）
 
 ---
 
@@ -8,8 +10,8 @@
 
 | Issue 類型 | 說明 | 恢復目標 |
 |-----------|------|---------|
-| `missing_technical_detail` | 技術實體（執行緒、函數、表格）遺失 | 從 materials.md 恢復到 technical_appendix.md 或 one_page.md |
-| `unused_citation` | Citation 未使用 | 檢查 Citation 內容，決定恢復到哪個檔案 |
+| `missing_technical_detail` | 技術實體（執行緒、函數、表格）遺失 | 從 materials.md 恢復到 one_page.md |
+| `unused_citation` | Citation 未使用 | 從 materials.md 恢復到 one_page.md |
 
 ---
 
@@ -29,29 +31,9 @@ Issue: "Q10：Android 完整流程的執行緒名稱遺失 [C6]"
 
 ---
 
-### 步驟 2：判斷恢復目標位置
+### 步驟 2：內容整合到 one_page.md
 
-根據 DETAIL_LEVEL 和 Issue 類型，決定將內容恢復到哪個檔案：
-
-| DETAIL_LEVEL | Issue 類型 | 恢復位置 |
-|--------------|-----------|---------|
-| BALANCED | missing_technical_detail | technical_appendix.md |
-| BALANCED | unused_citation（技術細節）| technical_appendix.md |
-| BALANCED | unused_citation（核心證據）| one_page.md + technical_appendix.md |
-| TECHNICAL | missing_technical_detail | one_page.md（主報告包含所有細節）|
-| TECHNICAL | unused_citation | one_page.md |
-| EXECUTIVE | missing_technical_detail | technical_appendix.md |
-| EXECUTIVE | unused_citation | technical_appendix.md（主報告極簡）|
-
-**如何區分「技術細節」與「核心證據」**：
-- **核心證據**：直接支持標題結論的數字、測試結果、效能改善數據
-- **技術細節**：實作機制、執行緒列表、函數呼叫鏈、引擎差異分析
-
----
-
-### 步驟 3：內容整合
-
-**恢復到 technical_appendix.md 的格式**：
+**恢復格式**：
 
 ```markdown
 ## {主題名稱} [{Citation ID}]
@@ -82,33 +64,18 @@ Issue: "Q10：Android 完整流程的執行緒名稱遺失 [C6]"
 （來源：materials.md [{Citation ID}]）
 ```
 
-**恢復到 one_page.md 的格式**：
+---
 
-```markdown
-## 證據
+### 步驟 3：篇幅處理
 
-### {證據點標題}
-
-{簡化摘要}。在 Android Touch2Photon 流程中，觸控事件經過以下執行緒處理：InputReader → InputDispatcher → ViewRootImpl → RenderThread。詳細的函數呼叫鏈和時序分析見技術附錄頁 2。[C6]
-
-（如 DETAIL_LEVEL = TECHNICAL，則直接展開完整內容，不使用「詳見附錄」）
-```
+v4.1 使用 Yoga Layout 自動處理排版：
+- **無篇幅限制**：所有內容都放 one_page.md
+- **自動字體縮放**：Yoga 會根據內容量自動計算字體大小
+- **最小字體約束**：本文 10pt、小字 8pt
 
 ---
 
-### 步驟 4：篇幅控制
-
-**one_page.md 篇幅限制**：
-- 如果恢復內容後超過篇幅（約 1500-2000 字），將詳細流程移到 technical_appendix.md
-- 主報告保留摘要 + 引用附錄頁碼：「詳見技術附錄頁 X」
-
-**technical_appendix.md 篇幅建議**：
-- 單一主題章節不超過 1 頁（約 500-700 字 + 1-2 個表格/圖）
-- 如內容過多，拆分為多個子章節
-
----
-
-### 步驟 5：保留 Citation 追溯性
+### 步驟 4：保留 Citation 追溯性
 
 **關鍵原則**：
 - ✓ 所有恢復的內容都必須標註 Citation ID
@@ -160,5 +127,3 @@ InputReader 執行緒負責讀取觸控事件（優先級為 -8，這是標準�
 | 完整性 | Issue 提到的所有技術實體（執行緒/函數/表格）都已恢復？|
 | 追溯性 | 每段恢復的內容都有 Citation ID？|
 | 一致性 | 恢復的內容與 materials.md 原文一致？沒有憑空生成？|
-| 位置正確 | 根據 DETAIL_LEVEL 恢復到正確檔案（one_page.md 或 technical_appendix.md）？|
-| 引用連結 | one_page.md 有「詳見技術附錄頁 X」的引用？|

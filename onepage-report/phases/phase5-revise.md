@@ -41,15 +41,9 @@
 
 **⚠️ 詳細流程請讀取：** `{skill_dir}/phases/appendix/phase5-content-recovery.md`
 
-### 快速恢復指引
+### 恢復位置
 
-| DETAIL_LEVEL | Issue 類型 | 恢復位置 |
-|--------------|-----------|---------|
-| BALANCED | missing_technical_detail | technical_appendix.md |
-| BALANCED | unused_citation（技術細節）| technical_appendix.md |
-| BALANCED | unused_citation（核心證據）| one_page.md + technical_appendix.md |
-| TECHNICAL | 任何 | one_page.md |
-| EXECUTIVE | 任何 | technical_appendix.md |
+v4.1 固定為 TECHNICAL 模式，所有內容都恢復到 `one_page.md`。
 
 **關鍵原則**：
 - ✓ 所有恢復的內容都必須標註 Citation ID

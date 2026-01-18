@@ -1,8 +1,47 @@
 # Phase 1：設定詢問
 
-## 1.0 繼續執行檢測（最優先）
+## 0.1 MCP Yoga Layout 可用性檢查（最優先）
 
-**首先檢查是否有之前的執行記錄：**
+**在開始任何設定之前，必須先確認 mcp-yogalayout 是否可用：**
+
+### 檢查步驟
+
+1. 使用 Bash 執行：`claude mcp list`
+2. 確認輸出中包含 `mcp-yogalayout` 且狀態為 `✓ Connected`
+
+### 如果 MCP 未配置或連接失敗
+
+告知使用者並**停止執行**：
+
+```
+⚠️ MCP Yoga Layout 未配置或無法連接。
+
+請依序執行以下步驟：
+
+1. 確認 mcp-yogalayout 已編譯：
+   cd D:\mcp-yogalayout && cargo build --release
+
+2. 配置 MCP server（全域可用）：
+   claude mcp add --scope user --transport stdio mcp-yogalayout -- "D:\mcp-yogalayout\target\release\mcp-yogalayout.exe"
+
+3. 重新啟動 Claude Code
+
+4. 驗證連接：
+   claude mcp list
+   （應看到 mcp-yogalayout: ... ✓ Connected）
+
+5. 重新執行此 skill
+```
+
+### 如果 MCP 已連接
+
+繼續執行下方流程。
+
+---
+
+## 1.0 繼續執行檢測
+
+**檢查是否有之前的執行記錄：**
 
 1. 使用 Glob 工具檢查 `./output/phase*/` 目錄是否存在
 2. 如果存在任何 phase 目錄，詢問使用者：
@@ -89,38 +128,30 @@
 
 ---
 
-## 1.2 技術細節程度詢問
+## 1.2 進階設定詢問
 
-在第一次詢問完成後，使用**第二次** AskUserQuestion 工具詢問技術細節保留程度：
+在第一次詢問完成後，使用**第二次** AskUserQuestion 工具詢問進階設定：
 
 ```json
 {
   "questions": [
     {
       "question": "啟用 Citation 網路補充",
-      "header": "技術細節",
+      "header": "Citation",
       "multiSelect": false,
       "options": [
-        {"label": "是", "description": "啟用 Citation 網路補充"},
-        {"label": "否", "description": "關閉 Citation 網路補充"}
+        {"label": "否 (預設)", "description": "關閉 Citation 網路補充"},
+        {"label": "是", "description": "啟用 Citation 網路補充"}
       ]
     },
     {
-      "question": "繪圖方法",
-      "header": "技術細節",
+      "question": "渲染引擎",
+      "header": "渲染",
       "multiSelect": false,
       "options": [
-        {"label": "pptx", "description": "PPTX Shapes 繪圖"},
-        {"label": "svg", "description": "圖表更精細但無法在 PPT 中編輯"}
-      ]
-    },
-    {
-      "question": "您希望報告保留多少技術細節？",
-      "header": "技術細節",
-      "multiSelect": false,
-      "options": [
-        {"label": "完整版", "description": "主報告詳細清楚，至少一張圖跟超多字，放不下的技術細節才用術語濃縮移到附錄"},
-        {"label": "自定", "description": "手動指定技術細節處理方式"}
+        {"label": "yoga_pywin32 (推薦)", "description": "Yoga Layout + pywin32，自動排版，支援原生 Chart"},
+        {"label": "pptx_shapes", "description": "python-pptx Shapes API，跨平台"},
+        {"label": "svg_png", "description": "SVG 生成轉 PNG，圖表精細但無法編輯"}
       ]
     }
   ]
@@ -137,9 +168,8 @@
 |------|------|--------|
 | `PURPOSE` | 報告目的 | - |
 | `EVIDENCE` | 佐證強度 | E0 |
-| `DETAIL_LEVEL` | 技術細節保留程度 | BALANCED |
 | `MAX_ITERATIONS` | 審稿輪數 | 5 |
-| `DIAGRAM_METHOD` | 繪圖方式 | pptx_shapes |
+| `LAYOUT_ENGINE` | 渲染引擎 | yoga_pywin32 |
 | `LAYOUT_REVIEW_ROUNDS` | 排版審查輪數 | 2（0 = 關閉）|
 | `REVIEW_WEB_SEARCH` | 審稿時是否啟用網路查證 | false |
 | `CITATION_WEB_SEARCH` | Citation Map 是否啟用網路補充 | false |
@@ -165,9 +195,8 @@
 
 PURPOSE: {PURPOSE 的值}
 EVIDENCE: {EVIDENCE 的值}
-DETAIL_LEVEL: {DETAIL_LEVEL 的值}
 MAX_ITERATIONS: {MAX_ITERATIONS 的值}
-DIAGRAM_METHOD: {DIAGRAM_METHOD 的值}
+LAYOUT_ENGINE: {LAYOUT_ENGINE 的值}
 LAYOUT_REVIEW_ROUNDS: {LAYOUT_REVIEW_ROUNDS 的值}
 REVIEW_WEB_SEARCH: {REVIEW_WEB_SEARCH 的值}
 CITATION_WEB_SEARCH: {CITATION_WEB_SEARCH 的值}

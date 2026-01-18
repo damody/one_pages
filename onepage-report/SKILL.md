@@ -45,12 +45,19 @@ arguments: [input_path]
 | `PURPOSE` | 報告目的 | - |
 | `EVIDENCE` | 佐證強度 | E0 |
 | `MAX_ITERATIONS` | 審稿輪數 | 5 |
-| `DIAGRAM_METHOD` | 繪圖方式 | pptx_shapes |
-| `LAYOUT_ENGINE` | 佈局引擎 | yoga_pywin32 |
+| `LAYOUT_ENGINE` | 渲染引擎 | yoga_pywin32 |
 | `LAYOUT_REVIEW_ROUNDS` | 排版審查輪數 | 2 |
 | `REVIEW_WEB_SEARCH` | 審稿時是否啟用網路查證 | false |
 | `CITATION_WEB_SEARCH` | Citation Map 是否啟用網路補充 | false |
 | `RESUME_FROM` | 從哪個 Phase 繼續（1-6） | 1 |
+
+### 渲染引擎選項
+
+| LAYOUT_ENGINE | 說明 | 適用情境 |
+|---------------|------|---------|
+| `yoga_pywin32` | Yoga Layout + pywin32，自動排版 | Windows，推薦 |
+| `pptx_shapes` | python-pptx Shapes API | 跨平台 |
+| `svg_png` | SVG 生成轉 PNG | 精細圖表，不可編輯 |
 
 ### Yoga Layout 字體約束
 

@@ -1,6 +1,6 @@
 # Phase 6 附錄：PPTX Shapes 渲染方式（python-pptx）
 
-> **使用條件：** 當 `DIAGRAM_METHOD = pptx_shapes` 時載入此檔案
+> **使用條件：** 當 `LAYOUT_ENGINE = pptx_shapes` 時載入此檔案
 > **執行前請讀取：** `{skill_dir}/reference/pptx-shapes.md`
 
 ---

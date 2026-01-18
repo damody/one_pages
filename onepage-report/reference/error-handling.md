@@ -2,7 +2,7 @@
 
 ## SVG 生成失敗
 
-如果 subagent 生成 SVG 失敗（僅適用於 DIAGRAM_METHOD = svg_png）：
+如果 subagent 生成 SVG 失敗（僅適用於 LAYOUT_ENGINE = svg_png）：
 
 1. 檢查 SVG 生成指示是否清晰完整
 2. 確認尺寸欄位格式正確（如 1056x528）
