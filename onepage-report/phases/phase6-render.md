@@ -118,29 +118,41 @@ renderer.render_from_layout(layout, content_data)
 renderer.save("./output/final.pptx", auto_close=True)
 ```
 
-**layout.json 格式：**
+**layout.json 格式（多頁自動分配）：**
+
+MCP yogalayout 會自動將內容分配到最少頁數的投影片中：
 
 ```json
 {
-  "slide": { "w_pt": 960, "h_pt": 540 },
-  "elements": [
+  "slide_size": { "w_pt": 960, "h_pt": 540 },
+  "total_pages": 2,
+  "pages": [
     {
-      "id": "title",
-      "kind": "text",
-      "role": "title",
-      "bounding_box": { "x": 24, "y": 24, "w": 912, "h": 44 }
+      "page_number": 1,
+      "used_height_pt": 520,
+      "remaining_height_pt": 20,
+      "elements": [
+        { "id": "title", "kind": "text", "role": "title", "box": { "x": 18, "y": 18, "w": 924, "h": 37 } },
+        { "id": "section:成功要素:heading", "kind": "text", "role": "h2", "box": { "x": 18, "y": 70, "w": 924, "h": 24 } },
+        { "id": "bullets:0", "kind": "bullets", "role": "body", "box": { "x": 18, "y": 100, "w": 924, "h": 100 } }
+      ]
     },
     {
-      "id": "fig:flow",
-      "kind": "figure",
-      "role": "body",
-      "ratio": "16:9",
-      "alt": "Pipeline 流程圖",
-      "bounding_box": { "x": 24, "y": 300, "w": 400, "h": 200 }
+      "page_number": 2,
+      "used_height_pt": 400,
+      "remaining_height_pt": 140,
+      "elements": [
+        { "id": "section:平台對比:heading", "kind": "text", "role": "h2", "box": { "x": 18, "y": 18, "w": 924, "h": 24 } },
+        { "id": "table:0", "kind": "table", "role": "body", "box": { "x": 18, "y": 50, "w": 924, "h": 200 } }
+      ]
     }
   ]
 }
 ```
+
+**MCP 選項：**
+- `auto_paginate: true`（預設）：自動將內容分配到多頁
+- `density: "comfortable"` 或 `"compact"`：控制間距密度
 
 **Markdown 轉換器：** 使用 `{skill_dir}/scripts/yoga_converter.py` 將 Phase 5 的 one_page.md 轉換為 mcp-yogalayout 格式：
 - `#` 標題保持
@@ -251,9 +263,9 @@ Task(
 
 1. 計算總行數和字數
 2. 確認所有章節標題（## 開頭）都會出現在 PPTX 中
-3. 如果內容過多：
-   - 使用多頁呈現（禁止刪減內容）
-   - 縮小字體（最小 8pt）
+3. MCP yogalayout 會自動分頁：
+   - 所有內容都會被渲染（禁止刪減）
+   - MCP 自動計算最佳分頁位置
    - **絕對禁止簡化或摘要內容**
 
 ---
@@ -413,12 +425,25 @@ add_textbox(slide, "內容", x+pad, y+title_h, w-2*pad, content_h, ...)
 ## 渲染流程
 
 1. **呼叫 MCP 工具計算佈局**（步驟 0 已完成）
-2. 使用 MCP 回傳的 bounding_box 座標
+   - MCP 會自動分頁，回傳 `pages` 陣列
+   - 每頁包含該頁的 `elements` 和座標
+2. **遍歷每一頁**：
+   - 為每個 `page` 建立一張投影片
+   - 使用該頁的 `elements` 座標定位元素
 3. 使用 `win32com.client.Dispatch("PowerPoint.Application")` 建立 PowerPoint
 4. 設定投影片大小為 16:9（960x540 pt）
 5. 使用 MCP 座標定位所有元素（禁止硬編碼）
 6. 使用 `modules_pywin32` 中的 draw_* 函數繪製圖表
 7. 儲存並關閉
+
+**多頁處理範例：**
+```python
+layout = json.load(open("layout.json"))
+for page in layout["pages"]:
+    slide = prs.Slides.Add(page["page_number"], ppLayoutBlank)
+    for elem in page["elements"]:
+        render_element(slide, elem)
+```
 
 ---
 
