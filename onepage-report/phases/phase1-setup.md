@@ -117,8 +117,8 @@
       "header": "進階",
       "multiSelect": false,
       "options": [
-        {"label": "2", "description": "排版審查次數 5 輪"},
-        {"label": "1", "description": "排版審查次數 3 輪"},
+        {"label": "2", "description": "排版審查次數 2 輪"},
+        {"label": "1", "description": "排版審查次數 1 輪"},
         {"label": "0", "description": "加快產出速度"},
       ]
     }

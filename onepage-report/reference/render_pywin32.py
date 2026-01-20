@@ -64,8 +64,8 @@ SLIDE_HEIGHT_PT = 540
 ROLE_STYLES = {
     "title": {"size": 26, "bold": True, "color": COLOR_TEXT},
     "subtitle": {"size": 14, "bold": True, "color": hex_to_bgr("#666666")},
-    "h2": {"size": 16, "bold": True, "color": ACCENT_BLUE},
-    "body": {"size": 11, "bold": False, "color": COLOR_TEXT},
+    "h2": {"size": 10, "bold": True, "color": ACCENT_BLUE},
+    "body": {"size": 8, "bold": False, "color": COLOR_TEXT},
     "caption": {"size": 10, "bold": False, "color": hex_to_bgr("#888888")},
     "mono": {"size": 10, "bold": False, "color": COLOR_TEXT, "font": "Consolas"},
 }

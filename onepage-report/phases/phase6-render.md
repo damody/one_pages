@@ -32,6 +32,74 @@ python -c "from pathlib import Path; Path('output').mkdir(parents=True, exist_ok
 
 ---
 
+## 6.1.5 內容合併（真正的 One Page）
+
+**目標**：將 `one_page.md` 和 `diagrams.md` 合併成一個統一的 Markdown，讓 yogalayout 能夠一次性計算所有內容（文字 + 圖表）的佈局。
+
+**為什麼需要合併？**
+- yogalayout 只讀取單一 Markdown 檔案
+- 分開的 `one_page.md` 和 `diagrams.md` 會導致附錄圖無法被納入佈局計算
+- 合併後，yogalayout 能自動決定：一頁能塞多少內容、是否需要分頁、字體大小
+
+**執行轉換：**
+
+```bash
+python {skill_dir}/scripts/yoga_converter.py \
+  --one-page ./output/phase5/one_page.md \
+  --diagrams ./output/phase5/diagrams.md \
+  --output ./output/one_page_yoga.md \
+  --content-json ./output/content.json \
+  --mode one_page
+```
+
+**參數說明：**
+- `--mode one_page`：盡量把所有內容（包括附錄圖）塞到一頁
+- `--mode multi_page`：主內容一頁，附錄圖另外分頁
+
+**驗證合併結果：**
+
+```bash
+python -c "
+from pathlib import Path
+p = Path('output/one_page_yoga.md')
+if not p.exists():
+    raise SystemExit('one_page_yoga.md not found')
+content = p.read_text(encoding='utf-8')
+fig_count = content.count('<fig ')
+print(f'合併完成：找到 {fig_count} 個圖表標籤')
+if fig_count == 0:
+    print('警告：沒有找到圖表標籤，請檢查 diagrams.md')
+"
+```
+
+**合併後的 Markdown 格式：**
+
+```markdown
+# 標題
+> 副標題
+
+## 已驗證的成功要素
+- 項目 1
+- 項目 2
+
+<fig id="main:before_after" ratio="21:9" kind="diagram" alt="前後對比圖" />
+
+## 現況與問題
+- 問題 1
+- 問題 2
+
+<fig id="appendix:android_flow" ratio="21:9" kind="diagram" alt="Android 全鏈路" />
+
+## 技術關鍵點
+...
+
+<fig id="appendix:platform_compare" ratio="21:9" kind="diagram" alt="PC vs Android" />
+```
+
+**⚠️ 重要**：後續的 yogalayout 呼叫要使用 `./output/one_page_yoga.md`，不是原始的 `one_page.md`。
+
+---
+
 ## 6.2 儲存 diagrams.md 並產生圖表
 
 **根據 `LAYOUT_ENGINE` 選擇渲染方式：**
@@ -228,13 +296,15 @@ Task(
 
 **⚠️ 在寫任何 Python 程式碼之前，你必須先完成以下動作：**
 
-1. **呼叫 MCP 工具** `mcp__mcp-yogalayout__compute_slide_layout`
-   - 傳入 `one_page.md` 的 Markdown 內容
+1. **呼叫 MCP 工具** `mcp__mcp-yogalayout__layout_compute_slide_layout`
+   - 使用 `./output/one_page_yoga.md`（已合併文字+圖表的 Markdown）
+   - 設定 `options.auto_paginate: true` 和 `options.density: "compact"`
    - 等待工具回傳 JSON 結果
 
 2. **將 MCP 回傳的完整 JSON 貼出來**
-   - 確認回應包含 `slide` 和 `elements` 欄位
+   - 確認回應包含 `pages` 陣列（多頁模式）
    - 確認每個元素都有 `bounding_box`（x, y, w, h）
+   - **特別確認 `<fig>` 標籤都有對應的 `kind: figure` 元素**
 
 3. **確認所有預期元素都有座標後，才能繼續**
 
@@ -244,28 +314,29 @@ Task(
 
 ## 🚨 步驟 1（強制）：圖表完整性清點
 
-讀取 `./output/phase5/diagrams.md`，列出所有圖表：
+讀取 `./output/one_page_yoga.md` 和 `./output/content.json`，列出所有圖表：
 
-| # | 圖表類型 | 圖表名稱 | 將渲染到第幾頁 |
-|---|---------|---------|---------------|
-| 1 | ??? | ??? | 第 ? 頁 |
-| 2 | ??? | ??? | 第 ? 頁 |
-| ... | ... | ... | ... |
+| # | 圖表 ID | 圖表類型 | ratio | 在 MCP layout 中的位置 |
+|---|---------|---------|-------|----------------------|
+| 1 | main:xxx | before_after | 21:9 | page 1, box (x,y,w,h) |
+| 2 | appendix:xxx | flow | 21:9 | page 1, box (x,y,w,h) |
+| ... | ... | ... | ... | ... |
 
-**🚫 如果有任何圖表被標記為「跳過」或「省略」，你的輸出將被拒絕。**
+**🚫 如果有任何圖表在 MCP layout 中找不到對應的 `figure` 元素，你的輸出將被拒絕。**
 **🚫 所有圖表都必須渲染，不得遺漏。**
 
 ---
 
 ## 🚨 步驟 2（強制）：內容完整性確認
 
-讀取 `./output/phase5/one_page.md`，確認：
+讀取 `./output/one_page_yoga.md`，確認：
 
-1. 計算總行數和字數
+1. 計算 `<fig>` 標籤數量（應該等於 content.json 中的 total_diagrams）
 2. 確認所有章節標題（## 開頭）都會出現在 PPTX 中
 3. MCP yogalayout 會自動分頁：
    - 所有內容都會被渲染（禁止刪減）
    - MCP 自動計算最佳分頁位置
+   - **目標是盡量塞進一頁（真正的 One Page）**
    - **絕對禁止簡化或摘要內容**
 
 ---
@@ -287,9 +358,13 @@ Task(
 
 請讀取以下檔案作為輸入：
 
-### 報告內容
-- `./output/phase5/one_page.md`（包含所有技術細節）
-- `./output/phase5/diagrams.md`
+### 合併後的報告（優先使用）
+- `./output/one_page_yoga.md`（已合併文字+圖表，供 MCP yogalayout 使用）
+- `./output/content.json`（圖表資訊，包含 diagrams_info 和 total_diagrams）
+
+### 原始報告內容（參考用）
+- `./output/phase5/one_page.md`（原始報告）
+- `./output/phase5/diagrams.md`（原始圖表規格，供渲染時參考詳細內容）
 - `./output/phase5/glossary.md`
 - `./output/phase5/script.md`
 - `./output/phase5/table.md`（如有）
@@ -492,13 +567,38 @@ Sub Agent 完成後，檢查以下檔案是否存在：
 
 ### B) 驗證圖表完整性
 
-讀取 `./output/render_final.py`，檢查：
-- 是否有 import 所有需要的 draw_* 模組
-- 是否有對應的圖表繪製函數呼叫
+讀取 `./output/content.json`，取得預期的圖表清單：
 
-對照 `./output/phase5/diagrams.md` 的圖表清單：
-- 每個 `## 主圖` 或 `## 附錄圖` 都必須有對應的繪製程式碼
-- 如果有遺漏 → **重新呼叫 Sub Agent，提供遺漏清單**
+```bash
+python -c "
+import json
+from pathlib import Path
+
+# 讀取 content.json
+content = json.loads(Path('output/content.json').read_text(encoding='utf-8'))
+expected = content.get('diagrams_info', [])
+total = content.get('total_diagrams', len(expected))
+print(f'預期圖表數量：{total}')
+for d in expected:
+    print(f'  - {d[\"id\"]} ({d[\"kind\"]})')
+
+# 讀取 render_final.py 檢查實際渲染
+render_code = Path('output/render_final.py').read_text(encoding='utf-8')
+missing = []
+for d in expected:
+    fig_id = d['id']
+    if fig_id not in render_code:
+        missing.append(fig_id)
+
+if missing:
+    print(f'⚠️ 遺漏的圖表：{missing}')
+    raise SystemExit(1)
+else:
+    print('✅ 所有圖表都有對應的渲染程式碼')
+"
+```
+
+如果有遺漏 → **重新呼叫 Sub Agent，提供遺漏清單**
 
 ### C) 驗證內容完整性
 
@@ -546,7 +646,22 @@ Task(
 完成所有 Write 與執行後，必須用 Bash 工具驗證輸出檔案存在且非空：
 
 ```bash
-python -c "from pathlib import Path; files=['output/diagrams.md','output/final.pptx','output/script.txt']; missing=[f for f in files if not Path(f).exists() or Path(f).stat().st_size==0]; print('missing_or_empty',missing); raise SystemExit(1 if missing else 0)"
+python -c "
+from pathlib import Path
+
+# 必須存在的檔案
+required = [
+    'output/one_page_yoga.md',   # 合併後的 Markdown
+    'output/content.json',        # 圖表資訊
+    'output/diagrams.md',         # 圖表規格（複製）
+    'output/final.pptx',          # 最終輸出
+    'output/script.txt'           # 演講稿
+]
+
+missing = [f for f in required if not Path(f).exists() or Path(f).stat().st_size==0]
+print('missing_or_empty', missing)
+raise SystemExit(1 if missing else 0)
+"
 ```
 
 若驗證失敗，代表輸出未落盤或被鎖住，必須停止流程並修正。
