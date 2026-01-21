@@ -63,7 +63,7 @@ def draw_before_after(slide, left, top, width, height,
     content_text = "\n".join(content_lines)
     add_textbox(slide, content_text,
                left + 8, top + 32, box_width - 16, height - 40,
-               font_size=9, color=COLOR_TEXT)
+               font_size=8, color=COLOR_TEXT)
 
     # 右側區塊（改善後）- 綠色
     right_left = left + box_width + 30
@@ -81,7 +81,7 @@ def draw_before_after(slide, left, top, width, height,
     content_text = "\n".join(content_lines)
     add_textbox(slide, content_text,
                right_left + 8, top + 32, box_width - 16, height - 40,
-               font_size=9, color=COLOR_TEXT)
+               font_size=8, color=COLOR_TEXT)
 
     # 中間箭頭
     arrow_y = top + height / 2 - 10
@@ -91,7 +91,7 @@ def draw_before_after(slide, left, top, width, height,
     if center_label:
         add_label(slide, center_label,
                  center_x - 40, arrow_y + 24, 80, 16,
-                 font_size=9, color=COLOR_BLUE, bold=True, align=2)
+                 font_size=8, color=COLOR_BLUE, bold=True, align=2)
 
     return left_panel, right_panel
 
@@ -140,8 +140,14 @@ def draw_before_after_with_flow(slide, left, top, width, height,
         table_height = 60 + len(bottom_table.get("rows", [])) * 20
         content_height = height - table_height - 10
 
-    header_height = 24
-    flow_height = content_height - header_height - 16
+    # 根據可用空間動態調整 header 和 padding
+    if content_height < 80:
+        header_height = 16  # 極小空間使用更小的 header
+        padding = 8
+    else:
+        header_height = 24
+        padding = 16
+    flow_height = max(20, content_height - header_height - padding)  # 最小 20pt
 
     # --- 左側面板（改善前）---
     left_panel = add_rounded_rect(slide, left, top, box_width, content_height,
@@ -216,7 +222,7 @@ def draw_before_after_with_flow(slide, left, top, width, height,
     if center_arrow_label:
         add_label(slide, center_arrow_label,
                  center_x - 35, arrow_y - 8, 70, 16,
-                 font_size=9, color=COLOR_BLUE, bold=True, align=2)
+                 font_size=8, color=COLOR_BLUE, bold=True, align=2)
 
     # --- 底部對比表格 ---
     if bottom_table:
@@ -261,7 +267,7 @@ def _draw_comparison_table(slide, left, top, width, height, table_data):
                 line_color=COLOR_GRAY_LIGHT, fill_color=COLOR_GRAY_BG)
         add_textbox(slide, header,
                    x + 4, top + 2, col_width - 8, row_height - 4,
-                   font_size=9, bold=True, color=COLOR_TEXT, align=2)
+                   font_size=8, bold=True, color=COLOR_TEXT, align=2)
 
     # 資料列
     for row_idx, row in enumerate(rows):
@@ -276,7 +282,7 @@ def _draw_comparison_table(slide, left, top, width, height, table_data):
                     line_color=COLOR_GRAY_LIGHT, fill_color=fill_color)
             add_textbox(slide, str(cell),
                        x + 4, y + 2, col_width - 8, row_height - 4,
-                       font_size=8, color=COLOR_TEXT, align=2)
+                       font_size=7, color=COLOR_TEXT, align=2)
 
 
 # =============================================================================

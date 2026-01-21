@@ -74,6 +74,6 @@ def draw_platform_compare(slide, left, top, width, height,
             if desc:
                 add_label(slide, desc,
                          left + width / 2 - 80, mid_y - 6, 160, 12,
-                         font_size=7, color=COLOR_ORANGE, align=2)
+                         font_size=6, color=COLOR_ORANGE, align=2)
 
     return shapes

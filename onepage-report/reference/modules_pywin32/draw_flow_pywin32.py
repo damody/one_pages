@@ -191,13 +191,13 @@ def draw_flow(slide, left, top, width, height, nodes,
         title_height = node_height / 2 if desc else node_height
         add_textbox(slide, title, x + 4, y + 4,
                    node_width - 8, title_height - 4,
-                   font_size=9, bold=True, color=text_color, align=2)
+                   font_size=8, bold=True, color=text_color, align=2)
 
         # 說明
         if desc:
             add_textbox(slide, desc, x + 4, y + node_height / 2,
                        node_width - 8, node_height / 2 - 4,
-                       font_size=8, bold=False, color=text_color, align=2)
+                       font_size=7, bold=False, color=text_color, align=2)
 
         # 箭頭（除了最後一個節點）
         if i < node_count - 1:
@@ -245,7 +245,7 @@ def draw_flow_vertical(slide, left, top, width, height, nodes,
     node_count = len(nodes)
     config = FLOW_LAYOUT_CONFIG
 
-    # 計算尺寸
+    # 計算尺寸（根據可用空間動態調整）
     arrow_height = config["arrow_size"]
     gap = config["gap"]
     node_width = width * 0.8  # 使用 80% 寬度
@@ -255,6 +255,14 @@ def draw_flow_vertical(slide, left, top, width, height, nodes,
     total_arrow_space = (arrow_height + gap * 2) * (node_count - 1)
     node_height = (height - total_arrow_space) / node_count
     node_height = min(node_height, config["node_height"])
+
+    # 極小空間處理：如果節點高度太小，減少箭頭和間距
+    if node_height < 15:
+        arrow_height = 6  # 縮小箭頭
+        gap = 2  # 縮小間距
+        total_arrow_space = (arrow_height + gap * 2) * (node_count - 1)
+        node_height = (height - total_arrow_space) / node_count
+        node_height = max(12, min(node_height, config["node_height"]))  # 最小 12pt
 
     # 建立節點
     shapes = []
@@ -285,18 +293,20 @@ def draw_flow_vertical(slide, left, top, width, height, nodes,
         # 文字顏色
         text_color = get_text_color(color) if not highlight else color
 
-        # 標題和說明（左右排列）
+        # 標題和說明（左右排列）- 確保文字框高度至少為正數
+        text_height = max(8, node_height - 4)  # 最小 8pt
+        font_sz = 8 if node_height >= 20 else 6  # 極小空間使用更小字體
         if desc:
-            add_textbox(slide, title, node_left + 4, y + 4,
-                       node_width * 0.45, node_height - 8,
-                       font_size=9, bold=True, color=text_color, align=1)
-            add_textbox(slide, desc, node_left + node_width * 0.5, y + 4,
-                       node_width * 0.45, node_height - 8,
-                       font_size=8, bold=False, color=text_color, align=1)
+            add_textbox(slide, title, node_left + 2, y + 2,
+                       node_width * 0.45, text_height,
+                       font_size=font_sz, bold=True, color=text_color, align=1)
+            add_textbox(slide, desc, node_left + node_width * 0.5, y + 2,
+                       node_width * 0.45, text_height,
+                       font_size=font_sz - 1, bold=False, color=text_color, align=1)
         else:
-            add_textbox(slide, title, node_left + 4, y + (node_height - 16) / 2,
-                       node_width - 8, 16,
-                       font_size=9, bold=True, color=text_color, align=2)
+            add_textbox(slide, title, node_left + 2, y + max(0, (node_height - 12) / 2),
+                       node_width - 4, min(16, text_height),
+                       font_size=font_sz, bold=True, color=text_color, align=2)
 
         # 箭頭（除了最後一個節點）
         if i < node_count - 1:

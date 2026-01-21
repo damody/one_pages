@@ -32,6 +32,173 @@ python -c "from pathlib import Path; Path('output').mkdir(parents=True, exist_ok
 
 ---
 
+## 6.1.4 圖表內容結構化（AI 預處理）
+
+**目標**：將 `diagrams.md` 的自然語言描述轉換為結構化 JSON，讓後續渲染程式不需要解析自然語言。
+
+**為什麼需要這一步？**
+- `diagrams.md` 是自然語言描述（ASCII art、列表、自由格式文字）
+- 不同專案的 diagrams.md 格式可能不同
+- 硬編碼的正則式無法適應所有格式
+- AI 可以理解任何格式的自然語言並提取結構化資訊
+
+**輸入**：`./output/phase5/diagrams.md`
+**輸出**：`./output/diagrams_structured.json`
+
+### 結構化 JSON 標準格式
+
+```json
+{
+  "diagrams": {
+    "main:xxx": {
+      "type": "before_after",
+      "title": "圖表標題",
+      "before": {
+        "title": "改善前",
+        "steps": ["步驟1", "步驟2", "步驟3"],
+        "highlights": [
+          {"text": "重點標注", "color": "red", "position": "步驟2"}
+        ]
+      },
+      "after": {
+        "title": "改善後",
+        "steps": ["步驟1", "步驟2（改善）", "步驟3"],
+        "highlights": [
+          {"text": "改善效果", "color": "green", "position": "步驟2"}
+        ]
+      }
+    },
+    "appendix:1xxx": {
+      "type": "flow",
+      "title": "流程圖標題",
+      "stages": [
+        {
+          "title": "階段1",
+          "nodes": ["節點A", "節點B", "節點C"],
+          "description": "階段說明"
+        },
+        {
+          "title": "階段2",
+          "nodes": ["節點D", "節點E"],
+          "description": "階段說明"
+        }
+      ]
+    },
+    "appendix:2xxx": {
+      "type": "platform_compare",
+      "title": "平台對比標題",
+      "platform1": {
+        "name": "PC",
+        "features": [
+          {"text": "特性1", "status": "ok"},
+          {"text": "特性2", "status": "warning"}
+        ]
+      },
+      "platform2": {
+        "name": "Android",
+        "features": [
+          {"text": "特性1", "status": "fail"},
+          {"text": "特性2", "status": "ok"}
+        ]
+      }
+    },
+    "appendix:3xxx": {
+      "type": "timeline",
+      "title": "時間軸標題",
+      "points": [
+        {"time": "T0", "label": "事件1", "description": "說明"},
+        {"time": "T1", "label": "事件2", "description": "說明"}
+      ],
+      "metrics": [
+        {"name": "指標1", "target": ">=5%", "method": "量測方法"},
+        {"name": "指標2", "target": "持平", "method": "量測方法"}
+      ]
+    },
+    "appendix:4xxx": {
+      "type": "comparison",
+      "title": "對比標題",
+      "left": {
+        "name": "選項A",
+        "features": ["特性1", "特性2", "特性3"],
+        "pros": ["優點1"],
+        "cons": ["缺點1"]
+      },
+      "right": {
+        "name": "選項B",
+        "features": ["特性1", "特性2", "特性3"],
+        "pros": ["優點1"],
+        "cons": ["缺點1"]
+      }
+    }
+  }
+}
+```
+
+### 執行 AI 預處理
+
+讀取 `./output/phase5/diagrams.md`，然後產生結構化 JSON：
+
+**AI Prompt 範本**：
+
+```
+請將以下 diagrams.md 內容轉換為結構化 JSON 格式。
+
+## 輸入
+{diagrams.md 內容}
+
+## 輸出要求
+
+根據每個圖表的類型，提取對應的結構化資料：
+
+1. **before_after 類型**：提取 before/after 的步驟列表、重點標注
+2. **flow 類型**：提取每個階段的標題和節點列表
+3. **platform_compare 類型**：提取兩個平台的特性對比（ok/warning/fail 狀態）
+4. **timeline 類型**：提取時間點和對應事件，以及量測指標
+5. **comparison 類型**：提取左右對比的名稱、特性、優缺點
+
+## 輸出格式
+
+直接輸出 JSON，不要加 markdown code block：
+{
+  "diagrams": {
+    "main:xxx": {...},
+    "appendix:1xxx": {...}
+  }
+}
+```
+
+**使用 Write 工具儲存結果：**
+
+```bash
+# AI 產生的 JSON 直接用 Write 工具寫入
+Write("./output/diagrams_structured.json", ai_generated_json)
+```
+
+**驗證結構化結果：**
+
+```bash
+python -c "
+import json
+from pathlib import Path
+
+p = Path('output/diagrams_structured.json')
+if not p.exists():
+    raise SystemExit('diagrams_structured.json not found')
+
+data = json.loads(p.read_text(encoding='utf-8'))
+diagrams = data.get('diagrams', {})
+print(f'結構化完成：{len(diagrams)} 個圖表')
+
+for fig_id, content in diagrams.items():
+    fig_type = content.get('type', 'unknown')
+    print(f'  - {fig_id} ({fig_type})')
+"
+```
+
+**下一步：** 在 6.1.5 執行 yoga_converter 時，使用 `--diagrams-structured ./output/diagrams_structured.json` 參數來使用此結構化資料。
+
+---
+
 ## 6.1.5 內容合併（真正的 One Page）
 
 **目標**：將 `one_page.md` 和 `diagrams.md` 合併成一個統一的 Markdown，讓 yogalayout 能夠一次性計算所有內容（文字 + 圖表）的佈局。
@@ -44,17 +211,28 @@ python -c "from pathlib import Path; Path('output').mkdir(parents=True, exist_ok
 **執行轉換：**
 
 ```bash
+# 基本用法（從 diagrams.md 解析圖表內容）
 python {skill_dir}/scripts/yoga_converter.py \
   --one-page ./output/phase5/one_page.md \
   --diagrams ./output/phase5/diagrams.md \
   --output ./output/one_page_yoga.md \
   --content-json ./output/content.json \
   --mode one_page
+
+# 進階用法（使用 AI 預處理的結構化 JSON）
+python {skill_dir}/scripts/yoga_converter.py \
+  --one-page ./output/phase5/one_page.md \
+  --diagrams ./output/phase5/diagrams.md \
+  --output ./output/one_page_yoga.md \
+  --content-json ./output/content.json \
+  --mode one_page \
+  --diagrams-structured ./output/diagrams_structured.json
 ```
 
 **參數說明：**
 - `--mode one_page`：盡量把所有內容（包括附錄圖）塞到一頁
 - `--mode multi_page`：主內容一頁，附錄圖另外分頁
+- `--diagrams-structured`：（可選）指定 AI 預處理過的結構化圖表 JSON。如果提供此參數，將直接使用 JSON 中的圖表內容，跳過從 diagrams.md 解析的步驟。這對於格式複雜或非標準的 diagrams.md 特別有用。
 
 **驗證合併結果：**
 

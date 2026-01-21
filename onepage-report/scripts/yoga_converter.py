@@ -311,6 +311,352 @@ def convert_one_page_to_yoga(one_page_md: str, diagrams: dict, mode: str = "one_
     return '\n'.join(result_lines)
 
 
+def parse_diagram_content(diagram_section: str, diagram_type: str) -> dict:
+    """
+    解析圖表內容區塊，提取結構化渲染資料
+
+    Args:
+        diagram_section: 圖表的 Markdown 區塊
+        diagram_type: 圖表類型 (before_after, flow, platform_compare, timeline, comparison)
+
+    Returns:
+        dict: 結構化的圖表內容
+    """
+    content = {"type": diagram_type}
+
+    # 提取「圖表內容」區塊
+    # 因為 code block 內可能有 --- 等字符，直接使用貪婪模式匹配到結尾
+    content_match = re.search(r'### 圖表內容\s*\n([\s\S]+)', diagram_section)
+    if not content_match:
+        return content
+
+    content_block = content_match.group(1).strip()
+
+    if diagram_type == "before_after":
+        content.update(_parse_before_after_content(content_block))
+    elif diagram_type == "flow":
+        content.update(_parse_flow_content(content_block))
+    elif diagram_type == "platform_compare":
+        content.update(_parse_platform_compare_content(content_block))
+    elif diagram_type == "timeline":
+        content.update(_parse_timeline_content(content_block))
+    elif diagram_type in ("comparison", "architecture"):
+        content.update(_parse_comparison_content(content_block))
+
+    return content
+
+
+def _parse_before_after_content(content_block: str) -> dict:
+    """解析 before_after 類型的內容"""
+    result = {"before": {}, "after": {}}
+
+    # 分割 Before 和 After 區塊
+    before_match = re.search(r'\*\*Before[^*]*\*\*\s*\n([\s\S]+?)(?=\*\*After|\Z)', content_block)
+    after_match = re.search(r'\*\*After[^*]*\*\*\s*\n([\s\S]+?)(?=\n---|\Z)', content_block)
+
+    if before_match:
+        before_block = before_match.group(1)
+        result["before"]["title"] = "改善前"
+
+        # 提取流程（從 ``` 區塊或 -> 連接的文字）
+        code_match = re.search(r'```\s*\n([\s\S]+?)\n```', before_block)
+        if code_match:
+            flow_text = code_match.group(1).strip()
+            # 解析箭頭連接的流程
+            nodes = re.split(r'\s*->\s*', flow_text.split('\n')[0])
+            result["before"]["flow"] = [n.strip().strip('[]') for n in nodes if n.strip()]
+
+        # 提取重點標注
+        annotations = []
+        for line in before_block.split('\n'):
+            if line.strip().startswith('- '):
+                annotations.append(line.strip()[2:])
+        result["before"]["annotations"] = annotations
+
+    if after_match:
+        after_block = after_match.group(1)
+        result["after"]["title"] = "改善後"
+
+        code_match = re.search(r'```\s*\n([\s\S]+?)\n```', after_block)
+        if code_match:
+            flow_text = code_match.group(1).strip()
+            nodes = re.split(r'\s*->\s*', flow_text.split('\n')[0])
+            result["after"]["flow"] = [n.strip().strip('[]') for n in nodes if n.strip()]
+
+        annotations = []
+        for line in after_block.split('\n'):
+            if line.strip().startswith('- '):
+                annotations.append(line.strip()[2:])
+        result["after"]["annotations"] = annotations
+
+    return result
+
+
+def _parse_flow_content(content_block: str) -> dict:
+    """解析 flow 類型的內容 - 支援多階段格式"""
+    result = {"stages": []}
+
+    # diagrams.md 格式：一行可能包含多個階段（用多個空格分隔）
+    # 例如：「第一階段：輸入捕獲                第二階段：引擎處理」
+
+    # 先找所有階段標題（可能在同一行或不同行）
+    stage_titles = {}  # {序號: 標題}
+    stage_order = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
+
+    for line in content_block.split('\n'):
+        # 找這一行中所有的「第X階段」
+        matches = re.findall(r'第([一二三四五六七八九十\d]+)階段[：:]\s*([^\s第]+(?:\s*[^\s第]+)?)', line)
+        for stage_num, stage_title in matches:
+            stage_titles[stage_num] = stage_title.strip()
+
+    # 解析 ASCII 圖表中的區塊
+    code_match = re.search(r'```\s*\n([\s\S]+?)\n```', content_block)
+    if code_match:
+        ascii_art = code_match.group(1)
+
+        # 把 ASCII 圖分成左右兩半（根據空格列分割）
+        lines = ascii_art.split('\n')
+
+        # 找出所有 +----+ 區塊並提取內容
+        all_blocks = []
+        current_block = []
+        in_block = False
+
+        for line in lines:
+            if '+--' in line and '--+' in line:
+                if in_block and current_block:
+                    all_blocks.append(current_block)
+                    current_block = []
+                in_block = True
+            elif in_block and '|' in line:
+                # 提取 | xxx | 中的內容
+                content = re.findall(r'\|\s*([^|]+)\s*\|', line)
+                for c in content:
+                    text = c.strip()
+                    # 過濾掉純裝飾行
+                    if text and text != 'v' and not text.startswith('-') and len(text) > 1:
+                        current_block.append(text)
+
+        if current_block:
+            all_blocks.append(current_block)
+
+        # 把區塊分配給各階段
+        if stage_titles:
+            for i, (num, title) in enumerate(sorted(stage_titles.items(),
+                    key=lambda x: stage_order.index(x[0]) if x[0] in stage_order else int(x[0]))):
+                stage = {"title": title, "nodes": []}
+                # 嘗試找對應的區塊
+                if i < len(all_blocks):
+                    stage["nodes"] = all_blocks[i][:6]
+                result["stages"].append(stage)
+        else:
+            # 沒找到階段標題，用區塊建立節點列表
+            nodes = []
+            for block in all_blocks:
+                nodes.extend(block)
+            result["nodes"] = nodes[:8]
+
+    # 同時提取「每階段標註」區塊的內容
+    annotations = []
+    for line in content_block.split('\n'):
+        if line.strip().startswith('- 第') and '階段' in line:
+            annotations.append(line.strip()[2:])
+    if annotations:
+        result["annotations"] = annotations
+
+    return result
+
+
+def _parse_platform_compare_content(content_block: str) -> dict:
+    """解析 platform_compare 類型的內容"""
+    result = {"platform1": {}, "platform2": {}, "rows": []}
+
+    # 找平台標題
+    platforms = re.findall(r'(PC|Android|Windows|iOS)[^)]*\)', content_block)
+    if len(platforms) >= 2:
+        result["platform1"]["title"] = platforms[0]
+        result["platform2"]["title"] = platforms[1]
+
+    # 找對比行（包含 OK、X、# 等符號的行）
+    for line in content_block.split('\n'):
+        if any(sym in line for sym in ['OK ', 'X ', '# ', '* ']):
+            # 清理並提取內容
+            clean_line = line.strip()
+            if clean_line:
+                result["rows"].append(clean_line)
+
+    return result
+
+
+def _parse_timeline_content(content_block: str) -> dict:
+    """解析 timeline 類型的內容 - 支援橫向時間軸"""
+    result = {"points": [], "dimensions": []}
+
+    # diagrams.md 格式是橫向時間軸：
+    #   T0           T1              T2              T3              T4
+    #   v            v               v               v               v
+    # 觸控事件    引擎讀取輸入    GPU 開始渲染    SurfaceFlinger    螢幕像素
+
+    lines = content_block.split('\n')
+
+    # 找包含 T0, T1, T2... 的行
+    time_line = None
+    time_line_idx = -1
+    for i, line in enumerate(lines):
+        if re.search(r'\bT\d+\b.*\bT\d+\b', line):  # 至少有兩個 TX
+            time_line = line
+            time_line_idx = i
+            break
+
+    if time_line and time_line_idx >= 0:
+        # 提取時間點
+        time_points = re.findall(r'(T\d+)', time_line)
+
+        # 跳過箭頭行（v 或 |），找描述行
+        desc_line = None
+        for i in range(time_line_idx + 1, min(time_line_idx + 5, len(lines))):
+            line = lines[i].strip()
+            if line and not re.match(r'^[|v\s]+$', line):
+                desc_line = lines[i]
+                break
+
+        if desc_line:
+            # 根據位置對應時間點和描述
+            # 用空格分割描述（多個空格作為分隔符）
+            descriptions = re.split(r'\s{2,}', desc_line.strip())
+            descriptions = [d.strip() for d in descriptions if d.strip()]
+
+            for j, tp in enumerate(time_points):
+                desc = descriptions[j] if j < len(descriptions) else ""
+                result["points"].append({"time": tp, "desc": desc})
+
+    # 解析 POC 三維度
+    # 找「系統延遲」「1% Low」「功耗」相關的區塊
+    dimension_keywords = ["系統延遲", "Low FPS", "1% Low", "功耗", "延遲", "FPS", "功耗行為"]
+
+    for keyword in dimension_keywords:
+        if keyword in content_block:
+            # 找包含該關鍵字的區塊
+            for line in lines:
+                if keyword in line:
+                    # 提取該區塊的關鍵信息
+                    clean = re.sub(r'[|+\-=]', '', line).strip()
+                    if clean and clean not in result["dimensions"]:
+                        result["dimensions"].append(clean)
+                        break
+
+    # 如果沒找到，嘗試從 ASCII 方框中提取
+    if not result["dimensions"]:
+        box_content = re.findall(r'\|\s*([^|]{3,}?)\s*\|', content_block)
+        for c in box_content:
+            text = c.strip()
+            if text and any(kw in text for kw in ["延遲", "FPS", "功耗", "目標", "量測", "Pass"]):
+                result["dimensions"].append(text)
+
+    return result
+
+
+def _parse_comparison_content(content_block: str) -> dict:
+    """解析 comparison/architecture 類型的內容 - 支援左右對比格式"""
+    result = {"left": {"title": "", "features": []}, "right": {"title": "", "features": []}, "features": []}
+
+    lines = content_block.split('\n')
+
+    # 找標題行（包含 vs 或左右並排的標題）
+    # 格式：「Unity (低延遲模式)                    Unreal (高吞吐模式)」
+    for line in lines:
+        # 跳過標題裝飾行
+        if line.strip().startswith('+') or line.strip().startswith('|'):
+            continue
+        if 'Unity' in line and 'Unreal' in line:
+            # 左右並排的標題
+            parts = re.split(r'\s{4,}', line)  # 用多個空格分割
+            if len(parts) >= 2:
+                result["left"]["title"] = parts[0].strip()
+                result["right"]["title"] = parts[1].strip()
+            break
+
+    # 如果沒找到標題，嘗試其他模式
+    if not result["left"]["title"]:
+        for line in lines:
+            if 'Unity' in line and '(' in line and not line.strip().startswith('+'):
+                match = re.search(r'(Unity[^)]*\))', line)
+                if match:
+                    result["left"]["title"] = match.group(1)
+            if 'Unreal' in line and '(' in line and not line.strip().startswith('+'):
+                match = re.search(r'(Unreal[^)]*\))', line)
+                if match:
+                    result["right"]["title"] = match.group(1)
+
+    # 如果還是沒找到，用簡單名稱
+    if not result["left"]["title"]:
+        result["left"]["title"] = "Unity"
+    if not result["right"]["title"]:
+        result["right"]["title"] = "Unreal"
+
+    # 找「特性：」區塊並提取列表（注意可能在 code block 內）
+    # 格式：
+    # 特性：                                特性：
+    # - 緩衝區較淺 (Double Buffer)          - 多幀管線 (Pipelined)
+
+    left_features = []
+    right_features = []
+    in_feature_block = False
+
+    for line in lines:
+        if '特性：' in line or '特性:' in line:
+            in_feature_block = True
+            continue
+
+        if in_feature_block:
+            if line.strip().startswith('- '):
+                # 檢查是否有左右兩個特性（用多個空格分隔）
+                parts = re.split(r'\s{4,}', line)
+                if len(parts) >= 2:
+                    left_item = parts[0].strip()
+                    right_item = parts[1].strip()
+                    if left_item.startswith('- '):
+                        left_features.append(left_item[2:].strip())
+                    if right_item.startswith('- '):
+                        right_features.append(right_item[2:].strip())
+                else:
+                    # 單一特性
+                    item = line.strip()[2:].strip()
+                    if item:
+                        left_features.append(item)
+
+            elif 'Anti-Lag' in line or '預期效果' in line:
+                # 進入預期效果區塊，繼續收集
+                continue
+            elif line.strip().startswith('```'):
+                # code block 結束
+                break
+            elif line.strip() and not line.strip().startswith('-') and not line.strip().startswith('|') and not line.strip().startswith('+'):
+                # 非列表行，可能是區塊結束
+                if '特性' not in line and 'Anti-Lag' not in line and '預期' not in line:
+                    in_feature_block = False
+
+    result["left"]["features"] = left_features[:4]
+    result["right"]["features"] = right_features[:4]
+
+    # 合併所有特性到 features（向後兼容）
+    all_features = []
+    left_title = result["left"]["title"].split('(')[0].strip() if result["left"]["title"] else "Left"
+    right_title = result["right"]["title"].split('(')[0].strip() if result["right"]["title"] else "Right"
+
+    for lf, rf in zip(left_features, right_features):
+        all_features.append(f"{left_title}: {lf}")
+        all_features.append(f"{right_title}: {rf}")
+
+    # 如果沒有成對的，就用 left_features
+    if not all_features:
+        all_features = left_features + right_features
+
+    result["features"] = all_features[:8]
+
+    return result
+
+
 def extract_chart_data_from_diagrams(diagrams_md: str) -> dict:
     """
     從 diagrams.md 提取可用於圖表的數據
@@ -345,7 +691,8 @@ def convert_files(
     diagrams_path: str,
     output_path: str,
     content_output_path: Optional[str] = None,
-    mode: str = "one_page"
+    mode: str = "one_page",
+    diagrams_structured_path: Optional[str] = None
 ) -> dict:
     """
     轉換 Phase 5 檔案到 mcp-yogalayout 格式
@@ -356,6 +703,9 @@ def convert_files(
         output_path: 輸出的 yoga markdown 路徑
         content_output_path: 輸出的 content.json 路徑（可選）
         mode: "one_page" 或 "multi_page"
+        diagrams_structured_path: AI 預處理過的結構化圖表 JSON 路徑（可選）
+            如果提供，將直接使用此 JSON 的 diagrams 欄位作為 diagrams_content，
+            跳過從 diagrams.md 解析內容的步驟
 
     Returns:
         dict: 轉換結果
@@ -387,7 +737,24 @@ def convert_files(
 
         # 產生 diagrams_info 列表，方便驗證時使用
         diagrams_list = []
+        diagrams_content = {}  # 結構化圖表內容
         total_count = 0
+
+        # 檢查是否有 AI 預處理過的結構化 JSON
+        structured_diagrams = None
+        if diagrams_structured_path:
+            try:
+                with open(diagrams_structured_path, 'r', encoding='utf-8') as f:
+                    structured_data = json.load(f)
+                    structured_diagrams = structured_data.get("diagrams", {})
+                    print(f"[yoga_converter] 載入結構化圖表 JSON: {diagrams_structured_path}")
+                    print(f"[yoga_converter] 包含 {len(structured_diagrams)} 個圖表")
+            except Exception as e:
+                print(f"[yoga_converter] 警告：無法載入結構化 JSON，將使用 diagrams.md 解析: {e}")
+                structured_diagrams = None
+
+        # 分割 diagrams.md 成區塊，用於解析詳細內容（當沒有結構化 JSON 時使用）
+        diagram_sections = re.split(r'^## ', diagrams_md, flags=re.MULTILINE) if not structured_diagrams else []
 
         if diagrams_info.get("main"):
             main = diagrams_info["main"]
@@ -401,6 +768,18 @@ def convert_files(
             })
             total_count += 1
 
+            # 優先使用結構化 JSON，否則從 diagrams.md 解析
+            if structured_diagrams and fig_id in structured_diagrams:
+                diagrams_content[fig_id] = structured_diagrams[fig_id]
+                print(f"[yoga_converter] 使用結構化資料: {fig_id}")
+            else:
+                # 找到對應的區塊並解析內容
+                for section in diagram_sections:
+                    if '主圖' in section:
+                        content = parse_diagram_content(section, main["type"])
+                        diagrams_content[fig_id] = content
+                        break
+
         for i, appendix in enumerate(diagrams_info.get("appendix", [])):
             fig_id = generate_fig_id(appendix["title"], i + 1, "appendix")
             diagrams_list.append({
@@ -412,8 +791,22 @@ def convert_files(
             })
             total_count += 1
 
+            # 優先使用結構化 JSON，否則從 diagrams.md 解析
+            if structured_diagrams and fig_id in structured_diagrams:
+                diagrams_content[fig_id] = structured_diagrams[fig_id]
+                print(f"[yoga_converter] 使用結構化資料: {fig_id}")
+            else:
+                # 找到對應的區塊並解析內容
+                appendix_num = i + 1
+                for section in diagram_sections:
+                    if f'附錄圖 {appendix_num}' in section or f'附錄圖{appendix_num}' in section:
+                        content = parse_diagram_content(section, appendix["type"])
+                        diagrams_content[fig_id] = content
+                        break
+
         content_data = {
             "diagrams_info": diagrams_list,  # 供渲染驗證使用
+            "diagrams_content": diagrams_content,  # 新增：結構化圖表內容
             "total_diagrams": total_count,
             "diagrams_raw": diagrams_info,   # 原始解析結果
             "chart_data": chart_data,
@@ -461,6 +854,11 @@ def main():
         default='one_page',
         help='Layout mode: one_page (pack everything) or multi_page (appendix on separate pages)'
     )
+    parser.add_argument(
+        '--diagrams-structured',
+        help='Path to AI pre-processed structured diagrams JSON (optional). '
+             'If provided, will use this instead of parsing diagrams.md'
+    )
 
     args = parser.parse_args()
 
@@ -469,7 +867,8 @@ def main():
         args.diagrams,
         args.output,
         args.content_json,
-        args.mode
+        args.mode,
+        getattr(args, 'diagrams_structured', None)
     )
 
     print(f"Converted: {result['yoga_md_path']}")

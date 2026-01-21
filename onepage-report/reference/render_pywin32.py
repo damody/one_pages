@@ -62,7 +62,7 @@ SLIDE_HEIGHT_PT = 540
 
 # 角色對應樣式
 ROLE_STYLES = {
-    "title": {"size": 26, "bold": True, "color": COLOR_TEXT},
+    "title": {"size": 20, "bold": True, "color": COLOR_TEXT},
     "subtitle": {"size": 14, "bold": True, "color": hex_to_bgr("#666666")},
     "h2": {"size": 10, "bold": True, "color": ACCENT_BLUE},
     "body": {"size": 8, "bold": False, "color": COLOR_TEXT},
@@ -357,22 +357,41 @@ class LayoutRenderer:
         alt = elem.get("alt", "")
         ratio = elem.get("ratio", "16:9")
 
-        # 根據 alt 描述決定圖表類型
-        alt_lower = alt.lower()
+        # 優先從 diagrams_content 取得類型
+        # 處理 id 前綴：layout.json 用 "fig:main:xxx"，content.json 用 "main:xxx"
+        diagrams_content = content_data.get("diagrams_content", {})
+        diagram_type = None
+        lookup_id = elem_id.replace("fig:", "") if elem_id.startswith("fig:") else elem_id
+        if lookup_id in diagrams_content:
+            diagram_type = diagrams_content[lookup_id].get("type")
 
-        if "折線" in alt or "趨勢" in alt or "line" in alt_lower:
-            self._render_line_chart(slide, x, y, w, h, elem_id, content_data)
-        elif "長條" in alt or "bar" in alt_lower or "column" in alt_lower:
-            self._render_bar_chart(slide, x, y, w, h, elem_id, content_data)
-        elif "圓餅" in alt or "pie" in alt_lower:
-            self._render_pie_chart(slide, x, y, w, h, elem_id, content_data)
-        elif "流程" in alt or "flow" in alt_lower:
+        # 根據類型決定渲染方式
+        if diagram_type == "before_after":
+            self._render_comparison(slide, x, y, w, h, elem_id, content_data)
+        elif diagram_type == "flow":
             self._render_flow_diagram(slide, x, y, w, h, elem_id, content_data)
-        elif "對比" in alt or "compare" in alt_lower or "before" in alt_lower:
+        elif diagram_type == "platform_compare":
+            self._render_comparison(slide, x, y, w, h, elem_id, content_data)
+        elif diagram_type == "timeline":
+            self._render_flow_diagram(slide, x, y, w, h, elem_id, content_data)
+        elif diagram_type in ("comparison", "architecture"):
             self._render_comparison(slide, x, y, w, h, elem_id, content_data)
         else:
-            # 預設：繪製佔位框
-            self._render_placeholder(slide, x, y, w, h, elem_id, alt)
+            # 回退到 alt 描述判斷
+            alt_lower = alt.lower()
+            if "折線" in alt or "趨勢" in alt or "line" in alt_lower:
+                self._render_line_chart(slide, x, y, w, h, elem_id, content_data)
+            elif "長條" in alt or "bar" in alt_lower or "column" in alt_lower:
+                self._render_bar_chart(slide, x, y, w, h, elem_id, content_data)
+            elif "圓餅" in alt or "pie" in alt_lower:
+                self._render_pie_chart(slide, x, y, w, h, elem_id, content_data)
+            elif "流程" in alt or "flow" in alt_lower:
+                self._render_flow_diagram(slide, x, y, w, h, elem_id, content_data)
+            elif "對比" in alt or "compare" in alt_lower or "before" in alt_lower:
+                self._render_comparison(slide, x, y, w, h, elem_id, content_data)
+            else:
+                # 預設：繪製佔位框
+                self._render_placeholder(slide, x, y, w, h, elem_id, alt)
 
     def _render_callout(
         self,
@@ -503,11 +522,68 @@ class LayoutRenderer:
 
     def _get_content_flow(self, elem_id: str, content_data: Dict) -> List:
         """從 content_data 取得流程節點"""
+        # 處理 id 前綴
+        lookup_id = elem_id.replace("fig:", "") if elem_id.startswith("fig:") else elem_id
+
+        # 優先從 diagrams_content 取得
+        diagrams_content = content_data.get("diagrams_content", {})
+        if lookup_id in diagrams_content:
+            dc = diagrams_content[lookup_id]
+            if dc.get("type") == "flow":
+                # 從 stages 轉換為 nodes
+                stages = dc.get("stages", [])
+                nodes = []
+                for stage in stages:
+                    if stage.get("title"):
+                        nodes.append({"title": stage["title"], "color": None})
+                    for node in stage.get("nodes", []):
+                        if node and node not in ("v", "|"):
+                            nodes.append({"title": node, "color": None})
+                return nodes if nodes else dc.get("nodes", [])
+            # before_after 的 flow
+            if dc.get("before", {}).get("flow"):
+                return [{"title": n} for n in dc["before"]["flow"]]
+
+        # 回退到舊格式
         flows = content_data.get("flows", {})
         return flows.get(elem_id, [])
 
     def _get_content_comparison(self, elem_id: str, content_data: Dict) -> Dict:
         """從 content_data 取得對比資料"""
+        # 處理 id 前綴
+        lookup_id = elem_id.replace("fig:", "") if elem_id.startswith("fig:") else elem_id
+
+        # 優先從 diagrams_content 取得
+        diagrams_content = content_data.get("diagrams_content", {})
+        if lookup_id in diagrams_content:
+            dc = diagrams_content[lookup_id]
+            if dc.get("type") == "before_after":
+                before = dc.get("before", {})
+                after = dc.get("after", {})
+                return {
+                    "before_title": before.get("title", "改善前"),
+                    "before_items": before.get("flow", [])[:6],  # 最多 6 項
+                    "after_title": after.get("title", "改善後"),
+                    "after_items": after.get("flow", [])[:6],
+                    "before_annotations": before.get("annotations", []),
+                    "after_annotations": after.get("annotations", [])
+                }
+            elif dc.get("type") == "platform_compare":
+                return {
+                    "before_title": dc.get("platform1", {}).get("title", "平台 A"),
+                    "before_items": [r.split("OK")[0].strip() if "OK" in r else r for r in dc.get("rows", [])[:5]],
+                    "after_title": dc.get("platform2", {}).get("title", "平台 B"),
+                    "after_items": []
+                }
+            elif dc.get("type") == "comparison":
+                return {
+                    "before_title": dc.get("left", {}).get("title", "A"),
+                    "before_items": dc.get("features", [])[:4],
+                    "after_title": dc.get("right", {}).get("title", "B"),
+                    "after_items": dc.get("features", [])[:4]
+                }
+
+        # 回退到舊格式
         comparisons = content_data.get("comparisons", {})
         return comparisons.get(elem_id, {})
 
