@@ -1,8 +1,11 @@
 # Phase 5：根據回饋重寫
 
-> **執行者：subagent**
+> **執行者：主 agent 控制 + subagent 重寫**
 > **輸入：** `./output/phase3/`（原稿）+ `./output/phase4/`（審稿結果）
-> **輸出：** `./output/phase5/`
+> **輸出：** `./output/phase5/`（只需 3 個文件）
+> **優化：** 主 agent 負責所有 I/O，subagent 只做純重寫（無工具呼叫）
+>
+> **bypass 文件：** script.md, glossary.md 從 Phase 3 直接傳到 Phase 6，不進入審稿迴圈
 
 ---
 
@@ -12,66 +15,132 @@
 1. 從 `./output/phase5/` 讀取 checkpoint，跳過本 Phase
 2. 直接進入 Phase 6
 
+**IF 審稿通過（Phase 4 issues.md 顯示「審稿通過，無需修改」）：**
+1. 直接複製 Phase 3 的文件到 Phase 5
+2. 跳過重寫，進入 Phase 6
+
 **ELSE：** 正常執行下方流程
 
 ---
 
-## 修正策略
+## 為什麼要用 Sub Agent
 
-| 使用者回答 | 處理方式 |
-|------------|----------|
-| 同意修正 | 按建議修改 |
-| 提供補充 | 整合新資訊後修改 |
-| 維持原樣 | 保留，但考慮是否需加註條件 |
+- 獨立的上下文，可以專注於修正任務
+- 避免主 agent 上下文過長影響效能
+- 但由主 agent 負責 I/O，減少 subagent 工具呼叫開銷
 
 ---
+
+## 執行流程（主 agent 負責 I/O）
+
+### 步驟 1：主 agent 讀取輸入檔案
+
+```
+使用 Read 工具讀取以下 4 個檔案：
+- ./output/phase3/one_page.md
+- ./output/phase3/diagrams.md
+- ./output/phase3/table.md
+- ./output/phase4/issues.md
+```
+
+### 步驟 2：主 agent 呼叫 subagent 重寫
+
+將讀取的內容直接嵌入 prompt，subagent **不使用任何工具**，只做純重寫：
+
+```
+Task(
+  description="根據審稿回饋重寫報告（純重寫）",
+  subagent_type="general-purpose",
+  prompt="""
+你是一位專業的技術寫作者，正在根據主管的審稿回饋修正報告。
+
+## 你的角色
+- 你要根據 issues.md 中列出的問題，修正報告內容
+- 你必須輸出**完整的**修正後文件，不是只有差異
+
+## ⚠️ 重要：不要使用任何工具
+- 不要使用 Read 工具（內容已提供）
+- 不要使用 Write 工具（主 agent 會負責寫入）
+- 直接分析下方內容，然後回傳修正後的完整文件
+
+## 審稿發現的問題
+
+{主 agent 貼上完整的 issues.md 內容}
+
+## 原始報告（需修正）
+
+### one_page.md
+{主 agent 貼上完整的 one_page.md 內容}
+
+### diagrams.md
+{主 agent 貼上完整的 diagrams.md 內容}
+
+### table.md
+{主 agent 貼上完整的 table.md 內容}
+
+## 修正策略
+
+| 問題類型 | 處理方式 |
+|----------|----------|
+| missing_evidence | 弱化結論，加註「仍需驗證」|
+| ambiguity | 明確化表述，加入條件說明 |
+| inconsistency | 統一數據，標註來源 |
+| decision_risk | 加入風險說明 |
+| undefined_term | 在首次使用處加入解釋 |
+| logic_gap | 補充推導過程 |
+| pyramid_violation | 調整結構順序 |
+| one_page_logic_gap | 重寫相關段落 |
+| not_plain_enough | 用更白話的方式重寫 |
 
 ## 禁止事項
 
 - ✗ 不可硬撐沒有證據的結論
 - ✗ 不可隱藏矛盾
 - ✗ 不可在沒數字時寫具體百分比
-- ✗ 不可忽略使用者提供的補充資訊
+- ✗ 不可忽略審稿指出的問題
 
----
+## 輸出格式（直接回傳，不要用工具）
 
-## 內容恢復流程
+請依序輸出三個完整的文件：
 
-當 Phase 4 審稿發現 `missing_technical_detail` 或 `unused_citation` Issue 時，需要從 materials.md 恢復遺失的技術細節。
+### ONE_PAGE_MD_START
+{完整的修正後 one_page.md 內容}
+### ONE_PAGE_MD_END
 
-**⚠️ 詳細流程請讀取：** `{skill_dir}/phases/appendix/phase5-content-recovery.md`
+### DIAGRAMS_MD_START
+{完整的修正後 diagrams.md 內容}
+### DIAGRAMS_MD_END
 
-### 恢復位置
+### TABLE_MD_START
+{完整的修正後 table.md 內容}
+### TABLE_MD_END
 
-v4.1 固定為 TECHNICAL 模式，所有內容都恢復到 `one_page.md`。
-
-**關鍵原則**：
-- ✓ 所有恢復的內容都必須標註 Citation ID
-- ✓ 保留原始 materials.md 的引用來源
-- ✗ 禁止憑空生成不在 materials.md 中的技術細節
-
----
-
-## 重要：每一輪都必須輸出完整的 Markdown 文件
-
-每次重寫時，必須輸出**完整的**文件內容，不要只輸出差異或修改的部分：
-
-```
-✗ 錯誤做法：「將第 3 點改為...」「在技術關鍵點後加入...」
-✓ 正確做法：輸出完整的 one_page.md、diagrams.md、script.md、glossary.md
+請直接輸出結果，不要使用任何工具。
+"""
+)
 ```
 
-### 每輪必須完整輸出的文件
+### 步驟 3：主 agent 解析並寫入結果
 
-| 文件 | 說明 |
-|------|------|
-| `one_page.md` | 完整報告內容（包含所有技術細節） |
-| `diagrams.md` | 完整圖表規格 |
-| `script.md` | 完整演講稿 |
-| `glossary.md` | 完整術語表 |
-| `citation_map.md` | 完整來源對照表 |
+收到 subagent 的回傳後，主 agent 執行：
 
-即使某個文件沒有修改，也要完整輸出。
+```
+1. 解析 subagent 回傳的內容：
+   - 提取 ONE_PAGE_MD_START 和 ONE_PAGE_MD_END 之間的內容
+   - 提取 DIAGRAMS_MD_START 和 DIAGRAMS_MD_END 之間的內容
+   - 提取 TABLE_MD_START 和 TABLE_MD_END 之間的內容
+
+2. 建立目錄：
+   python -c "from pathlib import Path; Path('output/phase5').mkdir(parents=True, exist_ok=True)"
+
+3. 使用 Write 工具寫入：
+   - ./output/phase5/one_page.md
+   - ./output/phase5/diagrams.md
+   - ./output/phase5/table.md
+
+4. 驗證：
+   python -c "from pathlib import Path; files=['output/phase5/one_page.md','output/phase5/diagrams.md','output/phase5/table.md']; missing=[f for f in files if not Path(f).exists() or Path(f).stat().st_size==0]; print('phase5_ok', not missing); raise SystemExit(1 if missing else 0)"
+```
 
 ---
 
@@ -143,26 +212,6 @@ WHILE 迭代計數 <= MAX_ITERATIONS:
 
 ---
 
-## Checkpoint 寫入
-
-1. 建立目錄：
-   ```bash
-   python -c "from pathlib import Path; Path('output/phase5').mkdir(parents=True, exist_ok=True)"
-   ```
-
-2. 使用 Write 工具寫入：
-   - `./output/phase5/one_page.md`（包含所有技術細節）
-   - `./output/phase5/diagrams.md`
-   - `./output/phase5/table.md`（如無則寫「# 無數據表」）
-   - `./output/phase5/glossary.md`
-   - `./output/phase5/script.md`
-   - `./output/phase5/citation_map.md`
-
-3. 驗證（必須）：
-   ```bash
-   python -c "from pathlib import Path; files=['output/phase5/one_page.md','output/phase5/diagrams.md','output/phase5/table.md','output/phase5/glossary.md','output/phase5/script.md','output/phase5/citation_map.md']; missing=[f for f in files if not Path(f).exists() or Path(f).stat().st_size==0]; print('missing_or_empty',missing); raise SystemExit(1 if missing else 0)"
-   ```
-
-### 多輪迭代時的版本保留
+## 多輪迭代時的版本保留
 
 當迭代輪次 > 1 時，同時複製到 `output/iterations/iter{N}/phase5/`。

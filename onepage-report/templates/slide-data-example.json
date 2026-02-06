@@ -1,0 +1,124 @@
+{
+  "metadata": {
+    "title": "天璣 SoC 導入 Anti-Lag 技術方案",
+    "subtitle": "參考 AMD Anti-Lag 2 已驗證的技術路徑",
+    "total_pages": 2
+  },
+  "pages": [
+    {
+      "page": 1,
+      "elements": [
+        {
+          "id": "title",
+          "kind": "text",
+          "role": "title",
+          "content": "天璣 SoC 導入 Anti-Lag 技術方案"
+        },
+        {
+          "id": "subtitle",
+          "kind": "text",
+          "role": "subtitle",
+          "content": "參考 AMD Anti-Lag 2 已驗證的技術路徑"
+        },
+        {
+          "id": "section:success_factors",
+          "kind": "section",
+          "title": "參考案例：PC 平台驗證數據",
+          "bullets": [
+            "在遊戲引擎內嵌入同步點 [C1]",
+            "解決 CPU-Bound 造成的 [[Frame Queue]] 堆積",
+            "實測改善：Click-to-Photon 延遲降低 23-37%"
+          ]
+        },
+        {
+          "id": "fig:main:antilag_sdk",
+          "kind": "figure",
+          "type": "before_after",
+          "data": {
+            "before": {
+              "title": "改善前：現況 Baseline",
+              "steps": [
+                "觸控事件 T=0ms",
+                "InputDispatcher T≈3-5ms",
+                "遊戲引擎處理 T≈10-15ms",
+                "GPU 渲染 T≈16-33ms",
+                "Frame Queue 等待 T≈15ms",
+                "SurfaceFlinger T≈8-12ms",
+                "Display T≈88ms"
+              ]
+            },
+            "after": {
+              "title": "改善後：導入 Anti-Lag SDK",
+              "steps": [
+                "觸控事件 T=0ms",
+                "InputDispatcher T≈3-5ms",
+                "遊戲引擎 + SDK 同步 T≈10-15ms",
+                "GPU 渲染 T≈16-33ms",
+                "Frame Queue ≈0ms (消除)",
+                "SurfaceFlinger T≈8-12ms",
+                "Display T≈78ms"
+              ]
+            }
+          }
+        },
+        {
+          "id": "section:problem",
+          "kind": "section",
+          "title": "現況問題",
+          "bullets": [
+            "Android 遊戲平均 Click-to-Photon 延遲：86-88ms",
+            "Frame Queue 堆積造成 15ms 額外延遲",
+            "競品（高通、三星）已開始布局低延遲技術"
+          ]
+        },
+        {
+          "id": "section:benefit",
+          "kind": "section",
+          "title": "預期效益",
+          "bullets": [
+            "系統總延遲降低 5-15%（保守估計）",
+            "絕對值改善 4-10ms",
+            "建立天璣平台低延遲競爭力"
+          ]
+        }
+      ]
+    },
+    {
+      "page": 2,
+      "elements": [
+        {
+          "id": "section:action",
+          "kind": "section",
+          "title": "行動建議",
+          "bullets": [
+            "Phase 1：技術預研（2週）- 驗證 Fence API 可用性",
+            "Phase 2：原型開發（4-6週）- SDK v0.1 + Demo",
+            "Phase 3：廠商驗證（4週）- 與遊戲廠商合作測試"
+          ]
+        },
+        {
+          "id": "fig:appendix:timeline",
+          "kind": "figure",
+          "type": "timeline",
+          "data": {
+            "points": [
+              {"time": "Phase 1", "label": "技術預研", "duration": "2週"},
+              {"time": "Phase 2", "label": "原型開發", "duration": "4-6週"},
+              {"time": "Phase 3", "label": "廠商驗證", "duration": "4週"}
+            ]
+          }
+        },
+        {
+          "id": "table:metrics",
+          "kind": "table",
+          "headers": ["指標", "基線", "目標", "測試方法"],
+          "rows": [
+            ["Click-to-Photon", "86-88ms", "降低 ≥5%", "GameBench"],
+            ["Frame Queue", "1.8 幀", "≤1.2 幀", "Systrace"],
+            ["Frame Time σ", "3-4ms", "降低 ≥10%", "Perfetto"]
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "slide-data-schema.json",
+  "title": "Slide Data Schema",
+  "description": "Phase 6 渲染器的輸入資料格式 - subagent 只需產生此格式的 JSON",
+  "type": "object",
+  "required": ["metadata", "pages"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["title"],
+      "properties": {
+        "title": {"type": "string", "description": "報告標題"},
+        "subtitle": {"type": "string", "description": "副標題"},
+        "total_pages": {"type": "integer", "minimum": 1}
+      }
+    },
+    "pages": {
+      "type": "array",
+      "description": "投影片頁面陣列",
+      "items": {
+        "type": "object",
+        "required": ["page", "elements"],
+        "properties": {
+          "page": {"type": "integer", "minimum": 1},
+          "elements": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/element"}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "element": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "description": "投影片元素",
+      "properties": {
+        "id": {"type": "string", "description": "元素唯一識別碼"},
+        "kind": {
+          "enum": ["text", "section", "figure", "table", "callout"],
+          "description": "元素類型"
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "text"}}},
+          "then": {
+            "properties": {
+              "content": {"type": "string"},
+              "role": {"enum": ["title", "subtitle", "h2", "body", "caption"]}
+            },
+            "required": ["content"]
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "section"}}},
+          "then": {
+            "properties": {
+              "title": {"type": "string"},
+              "bullets": {"type": "array", "items": {"type": "string"}}
+            },
+            "required": ["title", "bullets"]
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "figure"}}},
+          "then": {
+            "properties": {
+              "type": {
+                "enum": ["before_after", "flow", "timeline", "platform_compare", "architecture", "line_chart", "bar_chart", "pie_chart"]
+              },
+              "data": {"type": "object"}
+            },
+            "required": ["type", "data"]
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "table"}}},
+          "then": {
+            "properties": {
+              "headers": {"type": "array", "items": {"type": "string"}},
+              "rows": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}}
+            },
+            "required": ["headers", "rows"]
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "callout"}}},
+          "then": {
+            "properties": {
+              "content": {"type": "string"},
+              "style": {"enum": ["info", "warning", "success"]}
+            },
+            "required": ["content"]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -6,35 +6,50 @@ arguments: [input_path]
 
 # 一頁投影片產生器
 
-> 版本：v4.1（簡化架構 - TECHNICAL 模式 + Yoga 自動排版）
+> 版本：v5.0（性能優化 - 平行 subagent + JSON 模板設計）
 
 將素材（資料夾/PPTX/URL）轉換成專業的一頁投影片與演講稿。
 
 ## 架構說明
 
-**主 agent 只負責調控**，Phase 2-6 全部由 subagent 執行：
-- 每個 Phase 的 subagent 讀取上一個 Phase 的 checkpoint 資料
+**主 agent 負責調控與 I/O**，subagent 專注於分析與生成：
+- Phase 2：主 agent 讀取素材 + 平行 subagent WebSearch
+- Phase 3：兩階段平行（one_page.md 先，4 個衍生檔案平行）
+- Phase 4-5（審稿迴圈）：合併為單一 subagent（審稿+重寫）
+- Phase 6：JSON 模板設計（subagent 不讀 Python 模組）
 - 每個 Phase 完成後輸出到 `./output/phase{N}/`
 - 支援從任意 Phase 繼續執行
 
-**v4.1 簡化：**
-- 移除 DETAIL_LEVEL 選項（固定為 TECHNICAL 模式）
-- 所有技術細節都放在 one_page.md，不再分流到 technical_appendix.md
-- Phase 6 使用 Yoga Layout 自動計算字體大小，確保內容放得下
-- 移除字數限制，內容量由 Yoga 自動處理排版
+**v5.0 性能優化：**
+- Phase 2：主 agent 直接讀取 + 3 個平行 WebSearch subagent（9.5min → 4-5min）
+- Phase 3：兩階段平行設計（5.5min → 3.5min）
+- Phase 4-5：審稿+重寫合併，每輪 1 個 subagent（原本 2 個）
+- Phase 6：JSON 模板設計，subagent context 減少 97%（98k → 15-20k tokens）
+- 預估總時間：44min → ~15-20min
 
 ---
 
-## 執行流程概述
+## 執行流程概述（v5.0）
 
-| Phase | 說明 | 執行者 | 規範檔案 |
-|-------|------|--------|----------|
-| 1 | 設定詢問 | **主 agent** | `{skill_dir}/phases/phase1-setup.md` |
-| 2 | 讀取素材 | subagent | `{skill_dir}/phases/phase2-input.md` |
-| 3 | 產生初稿 | subagent | `{skill_dir}/phases/phase3-draft.md` |
-| 4 | 主管審稿 | subagent | `{skill_dir}/phases/phase4-review.md` |
-| 5 | 重寫迭代 | subagent | `{skill_dir}/phases/phase5-revise.md` |
-| 6 | 渲染輸出 | subagent | `{skill_dir}/phases/phase6-render.md` |
+| Phase | 說明 | 執行者 | 模型 | 規範檔案 | 預估時間 |
+|-------|------|--------|------|----------|----------|
+| 1 | 設定詢問 | **主 agent** | - | `{skill_dir}/phases/phase1-setup.md` | 1 min |
+| 2 | 讀取素材 | **主 agent + 3 平行 subagent** | Haiku | `{skill_dir}/phases/phase2-input.md` | 4-5 min |
+| 3 | 產生初稿 | **1+4 平行 subagent** | Haiku | `{skill_dir}/phases/phase3-draft.md` | 3.5 min |
+| 4-5 | 審稿+重寫 | **主 agent + 合併 subagent** | Sonnet | `{skill_dir}/phases/phase4-review.md` | 3 min |
+| 6 | 渲染輸出 | **主 agent + 輕量 subagent** | Haiku | `{skill_dir}/phases/phase6-render.md` | 2 min |
+
+### 模型選擇策略
+
+| 模型 | 速度 | 適用場景 |
+|------|------|---------|
+| **Haiku** | 快 5-6 倍 | Phase 3（格式化輸出）、Phase 6（結構化處理） |
+| **Sonnet** | 標準 | Phase 2（理解文檔）、Phase 4-5（深度推理、審稿） |
+
+**為何 Phase 3/6 用 Haiku：**
+- 任務性質：主要是格式化和擴寫，不需要複雜推理
+- 有明確範本：規範檔案已提供詳細格式要求
+- 可驗證性：Phase 4 會進行審稿，即使有小錯也能修正
 
 ---
 
@@ -95,96 +110,160 @@ arguments: [input_path]
 
 ---
 
-## Phase 2：讀取素材
+## Phase 2：讀取素材（v2 平行設計）
 
-**Task tool prompt：**
+**執行流程：** 詳見 `{skill_dir}/phases/phase2-input.md`
+
+**v2 改進：主 agent 直接讀取 + 平行 WebSearch**
+- 階段 1：主 agent 直接讀取素材（不用 subagent）
+- 階段 2：3 個平行 subagent 執行 WebSearch（若 `CITATION_WEB_SEARCH = true`）
+- 階段 3：主 agent 合併結果
+
+**階段 1：主 agent 讀取**
 ```
-請執行 Phase 2：讀取素材
-
-規範檔案：Read {skill_dir}/phases/phase2-input.md
-輸入資料：Read ./output/phase1/config.md
-素材路徑：{input_path}
-
-輸出位置：./output/phase2/
-```
-
----
-
-## Phase 3：產生初稿
-
-**Task tool prompt：**
-```
-請執行 Phase 3：產生初稿
-
-規範檔案：
-- Read {skill_dir}/phases/phase3-draft.md
-- Read {skill_dir}/templates/one-page-format.md
-- Read {skill_dir}/templates/diagrams-spec.md
-- Read {skill_dir}/templates/glossary-format.md
-- Read {skill_dir}/templates/script-format.md
-
-輸入資料：Read ./output/phase2/ 目錄下所有檔案
-
-輸出位置：./output/phase3/
+Read {input_path}/**/*.txt
+Read {input_path}/**/*.md
+執行 extract_pptx.py / extract_pdf.py（如有）
+建立初步 citation_map.md + terms.md
+Write ./output/phase2/materials.md
+Write ./output/phase2/citation_map.md
+Write ./output/phase2/terms.md
 ```
 
----
-
-## Phase 4：主管審稿
-
-**Task tool prompt：**
+**階段 2：平行 WebSearch（若啟用）**
+```python
+# 同時發起 3 個 Task（平行執行）
+Task(description="Phase 2A：WebSearch C1-C3", ...)
+Task(description="Phase 2B：WebSearch C4-C6", ...)
+Task(description="Phase 2C：WebSearch C7+", ...)
 ```
-請執行 Phase 4：主管審稿
 
-規範檔案：Read {skill_dir}/phases/phase4-review.md
-輸入資料：Read ./output/phase3/ 目錄下所有檔案
-
-如需詢問用戶補充資料，請直接使用 AskUserQuestion 工具。
-
-輸出位置：./output/phase4/
+**階段 3：合併結果**
+```
+解析 subagent 回傳的 JSON
+更新 citation_map.md 加入補充說明
 ```
 
 ---
 
-## Phase 5：重寫迭代
+## Phase 3：產生初稿（v2 兩階段平行）
 
-**Task tool prompt：**
+**執行流程：** 詳見 `{skill_dir}/phases/phase3-draft.md`
+
+**v2 改進：兩階段平行設計**
+- 階段 1：Subagent A 產生 one_page.md（核心報告）
+- 階段 2：4 個 subagent 平行產生衍生檔案
+- 總時間從 5.5 分鐘減少到 ~3.5 分鐘
+
+**階段 1：產生核心報告**
+```python
+Task(
+  description="Phase 3A：產生核心報告",
+  model="haiku",
+  prompt="讀取 materials.md, citation_map.md, terms.md，產生 one_page.md"
+)
+Write("./output/phase3/one_page.md", subagent_a_output)
 ```
-請執行 Phase 5：根據審稿回饋重寫
 
-規範檔案：Read {skill_dir}/phases/phase5-revise.md
-輸入資料：
-- Read ./output/phase3/ 目錄下所有檔案（原稿）
-- Read ./output/phase4/ 目錄下所有檔案（審稿結果）
+**階段 2：平行產生 4 個衍生檔案**
+```python
+# 在同一訊息中發起 4 個 Task（平行執行）
+Task(description="Phase 3B：產生 diagrams.md", ...)
+Task(description="Phase 3C：產生 table.md", ...)
+Task(description="Phase 3D：產生 glossary.md", ...)
+Task(description="Phase 3E：產生 script.md", ...)
 
-輸出位置：./output/phase5/
+# 等待完成後寫入
+Write("./output/phase3/diagrams.md", ...)
+Write("./output/phase3/table.md", ...)
+Write("./output/phase3/glossary.md", ...)
+Write("./output/phase3/script.md", ...)
+```
+
+---
+
+## Phase 4-5：審稿+重寫（v2 合併設計）
+
+**執行流程：** 詳見 `{skill_dir}/phases/phase4-review.md`
+
+**v2 改進：審稿+重寫合併為單一 subagent**
+- 每輪 1 個 subagent（vs 原本 2 個）
+- 3 輪總計 3 個 subagent（vs 原本 6 個）
+- Context 減少 ~50%（檔案只讀 1 次）
+
+**步驟 1：主 agent 讀取檔案**
+```
+IF 第 1 輪：
+    Read ./output/phase3/one_page.md
+    Read ./output/phase3/diagrams.md
+    Read ./output/phase3/table.md
+ELSE：
+    Read ./output/phase5/one_page.md
+    Read ./output/phase5/diagrams.md
+    Read ./output/phase5/table.md
+```
+
+**步驟 2：主 agent 呼叫合併 subagent**
+- 將讀取的內容嵌入 prompt
+- Subagent **不使用任何工具**
+- Subagent 同時回傳：
+  - ISSUES（問題清單，或 "PASS"）
+  - 修正後的 ONE_PAGE.MD、DIAGRAMS.MD、TABLE.MD（或 "NO_CHANGE"）
+
+**步驟 3：主 agent 解析並寫入結果**
+```
+Write ./output/phase4/issues.md
+IF one_page != "NO_CHANGE": Write ./output/phase5/one_page.md
+IF diagrams != "NO_CHANGE": Write ./output/phase5/diagrams.md
+IF table != "NO_CHANGE": Write ./output/phase5/table.md
 ```
 
 ### 多輪迭代
 
-當 `MAX_ITERATIONS > 1` 時，主 agent 控制迭代：
-
 ```
 WHILE 迭代計數 <= MAX_ITERATIONS:
-    呼叫 Phase 4 subagent
-    IF 審稿通過: BREAK
-    IF 達到上限: BREAK
-    呼叫 Phase 5 subagent
+    呼叫合併 subagent（審稿+重寫）
+    IF ISSUES == "PASS": BREAK
+    IF 達到上限: 執行強制保守輸出
 ```
 
 ---
 
-## Phase 6：渲染輸出
+## Phase 6：渲染輸出（v2 - JSON 模板設計）
 
-**Task tool prompt：**
+**執行流程：** 詳見 `{skill_dir}/phases/phase6-render.md`
+
+**v2 改進（減少 80% context）**：
+- ✅ Subagent 不再讀取 Python 模組
+- ✅ Subagent 只產生 `slide_data.json`（結構化資料）
+- ✅ 固定渲染器 `render_from_json.py` 處理 PPTX 產生
+- ✅ MCP 呼叫移到主 agent（避免 subagent prompt 過大）
+
+**主 agent 執行步驟**：
+1. 執行 `yoga_converter.py` 合併內容 → `one_page_yoga.md`, `content.json`
+2. 呼叫 MCP yogalayout 取得座標 → `layout.json`
+3. 呼叫輕量 subagent 產生 `slide_data.json`（讀取 `{skill_dir}/templates/phase6-subagent-prompt.md`）
+4. 執行 `render_from_json.py` 產生 PPTX
+
+**Subagent 呼叫**：
+```python
+Task(
+  description="Phase 6：產生 slide_data.json",
+  subagent_type="general-purpose",
+  model="haiku",  # 輕量任務用 Haiku
+  prompt=f"""
+{phase6_subagent_prompt}  # 從 templates/phase6-subagent-prompt.md 讀取
+
+## 輸入
+{one_page_yoga_content}
+{content_json}
+
+請產生 slide_data.json。
+"""
+)
 ```
-請執行 Phase 6：渲染輸出
 
-規範檔案：Read {skill_dir}/phases/phase6-render.md
-輸入資料：Read ./output/phase5/ 目錄下所有檔案
-
-輸出位置：./output/
-```
+**預估 token**：15-20k（vs 原本 98k）
 
 ---
 
@@ -202,27 +281,26 @@ WHILE 迭代計數 <= MAX_ITERATIONS:
 │   ├── one_page.md              # 包含所有技術細節
 │   ├── diagrams.md
 │   ├── table.md
-│   ├── glossary.md
-│   └── script.md
+│   ├── glossary.md              # bypass: 直接傳到 Phase 6
+│   └── script.md                # bypass: 直接傳到 Phase 6
 ├── phase4/                      # Phase 4 checkpoint
-│   ├── issues.md
-│   ├── verification.md
-│   └── user_answers.md
-├── phase5/                      # Phase 5 checkpoint
+│   └── issues.md                # 審稿結果（最多 3 個問題）
+├── phase5/                      # Phase 5 checkpoint（審稿迴圈只處理 3 個文件）
 │   ├── one_page.md              # 包含所有技術細節
 │   ├── diagrams.md
-│   ├── table.md
-│   ├── glossary.md
-│   ├── script.md
-│   └── citation_map.md
+│   └── table.md
 ├── iterations/                  # 多輪迭代版本保留
 │   ├── iter1/phase4/, phase5/
 │   └── iter2/phase4/, phase5/
 ├── final.pptx                   # 最終輸出：主投影片
 ├── script.txt                   # 演講稿
-├── citation_map.md              # 來源對照表
 └── glossary.md                  # 術語詞彙表
 ```
+
+**Bypass 文件說明：**
+- `script.md` 和 `glossary.md` 從 Phase 3 直接傳到 Phase 6，不進入審稿迴圈
+- Phase 4-5 只處理 `one_page.md`、`diagrams.md`、`table.md` 三個文件
+- 優化效果：減少 I/O 量，加速審稿迴圈執行
 
 ---
 
@@ -232,31 +310,34 @@ WHILE 迭代計數 <= MAX_ITERATIONS:
 
 ---
 
-## 檔案結構（v4.1 簡化）
+## 檔案結構（v5.0）
 
 ```
 onepage-report/
 ├── SKILL.md                     # 本檔案（主入口）
 ├── phases/                      # 執行階段規範
 │   ├── phase1-setup.md
-│   ├── phase2-input.md
-│   ├── phase3-draft.md          # 簡化：移除 DETAIL_LEVEL 分支
-│   ├── phase4-review.md
-│   ├── phase5-revise.md
-│   ├── phase6-render.md         # Yoga Layout + pywin32
+│   ├── phase2-input.md          # v2: 平行 WebSearch 設計
+│   ├── phase3-draft.md          # v2: 兩階段平行設計
+│   ├── phase4-review.md         # v2: 審稿+重寫合併
+│   ├── phase5-revise.md         # 已整合到 phase4-review.md
+│   ├── phase6-render.md         # v2: JSON 模板設計
 │   ├── phase6-render-pptx-shapes.md  # 備選渲染方式
 │   ├── phase6-render-svg.md     # 備選渲染方式
 │   └── appendix/                # 附錄檔案（按需載入）
-│       ├── phase4-checklist-detail.md          # 審稿檢查清單詳解
-│       └── phase5-content-recovery.md          # 內容恢復流程
+│       ├── phase4-checklist-detail.md
+│       └── phase5-content-recovery.md
 ├── templates/                   # 輸出模板與格式規範
-│   ├── one-page-format.md       # 簡化：移除字數限制
+│   ├── one-page-format.md
 │   ├── diagrams-spec.md
 │   ├── glossary-format.md
 │   ├── script-format.md
+│   ├── slide-data-schema.json   # v2: JSON Schema 定義
+│   ├── slide-data-example.json  # v2: 範例資料
+│   ├── phase6-subagent-prompt.md # v2: 輕量 subagent prompt（102 行）
 │   ├── experiment-plan.md
-│   └── appendix/                # 模板附錄
-│       └── diagrams-spec-types.md  # 圖表類型詳細規範
+│   └── appendix/
+│       └── diagrams-spec-types.md
 ├── reference/                   # 技術參考文件
 │   ├── render_pywin32.py        # pywin32 渲染器
 │   ├── modules_pywin32/         # pywin32 圖表模組
@@ -266,7 +347,9 @@ onepage-report/
 └── scripts/                     # Python 腳本
     ├── extract_pptx.py
     ├── extract_pdf.py
-    └── pptx_reference.py
+    ├── pptx_reference.py
+    ├── yoga_converter.py        # Markdown 轉 Yoga 格式
+    └── render_from_json.py      # v2: 固定 JSON 渲染器（轉換 JSON → PPTX）
 ```
 
 ---

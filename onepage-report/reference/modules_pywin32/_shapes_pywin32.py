@@ -178,84 +178,43 @@ def add_arrow_line(slide, x1, y1, x2, y2,
     return line
 
 
-def add_right_arrow(slide, left, top, width, height, fill_color):
+_ARROW_SHAPES = {"right": 33, "left": 34, "up": 35, "down": 36}
+
+
+def add_arrow(slide, left, top, width, height, fill_color, direction="right"):
     """
-    新增向右箭頭形狀
+    新增箭頭形狀
 
     Args:
         slide: pywin32 Slide 物件
         left, top: 左上角位置（pt）
         width, height: 寬高（pt）
         fill_color: 填充顏色（BGR）
+        direction: 方向（right/left/up/down）
 
     Returns:
         Shape 物件
     """
-    # msoShapeRightArrow = 33
-    shape = slide.Shapes.AddShape(33, left, top, width, height)
+    shape = slide.Shapes.AddShape(_ARROW_SHAPES[direction], left, top, width, height)
     set_fill(shape, fill_color)
     shape.Line.Visible = False
     return shape
+
+
+def add_right_arrow(slide, left, top, width, height, fill_color):
+    return add_arrow(slide, left, top, width, height, fill_color, "right")
 
 
 def add_down_arrow(slide, left, top, width, height, fill_color):
-    """
-    新增向下箭頭形狀
-
-    Args:
-        slide: pywin32 Slide 物件
-        left, top: 左上角位置（pt）
-        width, height: 寬高（pt）
-        fill_color: 填充顏色（BGR）
-
-    Returns:
-        Shape 物件
-    """
-    # msoShapeDownArrow = 36
-    shape = slide.Shapes.AddShape(36, left, top, width, height)
-    set_fill(shape, fill_color)
-    shape.Line.Visible = False
-    return shape
+    return add_arrow(slide, left, top, width, height, fill_color, "down")
 
 
 def add_left_arrow(slide, left, top, width, height, fill_color):
-    """
-    新增向左箭頭形狀
-
-    Args:
-        slide: pywin32 Slide 物件
-        left, top: 左上角位置（pt）
-        width, height: 寬高（pt）
-        fill_color: 填充顏色（BGR）
-
-    Returns:
-        Shape 物件
-    """
-    # msoShapeLeftArrow = 34
-    shape = slide.Shapes.AddShape(34, left, top, width, height)
-    set_fill(shape, fill_color)
-    shape.Line.Visible = False
-    return shape
+    return add_arrow(slide, left, top, width, height, fill_color, "left")
 
 
 def add_up_arrow(slide, left, top, width, height, fill_color):
-    """
-    新增向上箭頭形狀
-
-    Args:
-        slide: pywin32 Slide 物件
-        left, top: 左上角位置（pt）
-        width, height: 寬高（pt）
-        fill_color: 填充顏色（BGR）
-
-    Returns:
-        Shape 物件
-    """
-    # msoShapeUpArrow = 35
-    shape = slide.Shapes.AddShape(35, left, top, width, height)
-    set_fill(shape, fill_color)
-    shape.Line.Visible = False
-    return shape
+    return add_arrow(slide, left, top, width, height, fill_color, "up")
 
 
 # =============================================================================

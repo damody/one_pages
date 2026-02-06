@@ -165,7 +165,7 @@ def draw_flow(slide, left, top, width, height, nodes,
 
         title = node.get("title", "")
         desc = node.get("desc", "")
-        color = node.get("color", default_color)
+        color = node.get("color") or default_color
         highlight = node.get("highlight", False)
 
         # 計算位置
@@ -273,7 +273,7 @@ def draw_flow_vertical(slide, left, top, width, height, nodes,
 
         title = node.get("title", "")
         desc = node.get("desc", "")
-        color = node.get("color", default_color)
+        color = node.get("color") or default_color
         highlight = node.get("highlight", False)
 
         # 計算位置
