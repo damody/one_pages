@@ -131,6 +131,11 @@ Task(
 ## 規範
 Read {skill_dir}/templates/diagrams-spec.md
 
+## 重要限制
+- **不要讀取** diagrams-spec-types.md（該檔案是 Phase 6 渲染器參考，與你無關）
+- **不要寫尺寸**：所有尺寸由 yoga_converter 自動計算，不需要指定像素
+- **不要寫顏色/箭頭樣式**：視覺細節由 Phase 6 渲染器自動決定
+
 ## 主報告內容
 {one_page_content}
 
@@ -228,23 +233,9 @@ Write("./output/phase3/script.md", subagent_e_output)
 
 ---
 
-## 3.3 Checkpoint 驗證
+## 3.3 驗證
 
-```bash
-python -c "
-from pathlib import Path
-files = [
-    'output/phase3/one_page.md',
-    'output/phase3/diagrams.md',
-    'output/phase3/table.md',
-    'output/phase3/glossary.md',
-    'output/phase3/script.md'
-]
-missing = [f for f in files if not Path(f).exists() or Path(f).stat().st_size == 0]
-print('missing_or_empty', missing)
-raise SystemExit(1 if missing else 0)
-"
-```
+Write 工具會回報寫入結果。如果所有 Write 成功（無錯誤回傳），直接進入下一個 Phase，不需要額外的 Bash 驗證。
 
 ---
 
